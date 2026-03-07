@@ -36,4 +36,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   game: {
     onDetected: (cb) => ipcRenderer.on('game:detected', (_e, d) => cb(d)),
   },
+  overlay: {
+    setPosition: (positions) => ipcRenderer.invoke('overlay:setPosition', positions),
+    getPosition: () => ipcRenderer.invoke('overlay:getPosition'),
+    startMove: () => ipcRenderer.invoke('overlay:startMove'),
+    stopMove: () => ipcRenderer.invoke('overlay:stopMove'),
+    onDragMode: (cb) => ipcRenderer.on('overlay:dragMode', (_e, d) => cb(d)),
+  },
 });

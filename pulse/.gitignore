@@ -90,3 +90,13 @@ typings/
 
 # Electron-Forge
 out/
+
+# SQLite database
+pulse.db
+
+# C++ build artifacts
+capture/*.obj
+capture/*.pdb
+capture/*.ilk
+capture/*.exp
+capture/*.lib

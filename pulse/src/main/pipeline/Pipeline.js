@@ -9,7 +9,7 @@ const DirectionDecoder = require('./DirectionDecoder');
 const Classifier = require('./Classifier');
 const PriorityArbiter = require('./PriorityArbiter');
 const MotorCommandGenerator = require('./MotorCommandGenerator');
-const { DEFAULT_PRIORITY } = require('../../shared/constants');
+const { DEFAULT_PRIORITY, SPECTRAL_THRESHOLDS } = require('../../shared/constants');
 
 const TICK_INTERVAL_MS = 10;
 const METRICS_INTERVAL_MS = 1000;
@@ -48,10 +48,11 @@ class Pipeline extends EventEmitter {
       sampleRate: 48000,
       bufferSize: 2048,
       useOnnxSeparator: false,
-      hfThreshold: 0.04,
+      hfThreshold: 0.20,
       priorityMap: { ...DEFAULT_PRIORITY },
       enabledCategories: ['GUNSHOT', 'FOOTSTEP', 'EXPLOSION', 'ABILITY', 'RELOAD', 'ALERT', 'UNKNOWN'],
       confidenceThreshold: 0.4,
+      thresholds: { ...SPECTRAL_THRESHOLDS },
       modelPath: null,
       deviceIndex: null,
       ...config,
@@ -99,6 +100,7 @@ class Pipeline extends EventEmitter {
       this._classifier = new Classifier({
         modelPath: cfg.modelPath,
         confidenceThreshold: cfg.confidenceThreshold,
+        thresholds: cfg.thresholds,
       });
       await this._classifier.init();
 

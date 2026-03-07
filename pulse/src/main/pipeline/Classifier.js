@@ -1,5 +1,6 @@
 const fs = require('fs');
 const { EventCategory } = require('../../shared/constants');
+const SpectralClassifier = require('./SpectralClassifier');
 
 const MEL_BINS = 128;
 const TIME_FRAMES = 32;
@@ -8,10 +9,11 @@ class Classifier {
   /**
    * @param {{ modelPath: string, confidenceThreshold?: number }} opts
    */
-  constructor({ modelPath, confidenceThreshold = 0.4 } = {}) {
+  constructor({ modelPath, confidenceThreshold = 0.4, thresholds = {} } = {}) {
     this.modelPath = modelPath;
     this.confidenceThreshold = confidenceThreshold;
     this._session = null;
+    this._spectral = new SpectralClassifier({ confidenceThreshold, thresholds });
     this._categories = [
       EventCategory.GUNSHOT,
       EventCategory.FOOTSTEP,
@@ -49,7 +51,7 @@ class Classifier {
    */
   classify(stftResult) {
     if (!this._session) {
-      return { category: EventCategory.UNKNOWN, confidence: 0 };
+      return this._spectral.classify(stftResult);
     }
 
     try {
@@ -85,7 +87,7 @@ class Classifier {
    */
   async classifyAsync(stftResult) {
     if (!this._session) {
-      return { category: EventCategory.UNKNOWN, confidence: 0 };
+      return this._spectral.classify(stftResult);
     }
 
     try {

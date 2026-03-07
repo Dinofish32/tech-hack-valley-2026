@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { init: initDb } = require('./db');
 const { registerIpcHandlers, setActiveGamePid, setOverlayWindow, setMotorWindow } = require('./ipc');
 const GameDetector = require('./gameDetector');
@@ -13,10 +14,29 @@ let motorWin      = null;
 let gameDetector  = null;
 let activeGamePid = null;
 
+function overlayPositionsPath() {
+  return path.join(app.getPath('userData'), 'overlay-positions.json');
+}
+function loadOverlayPositions() {
+  try {
+    const data = fs.readFileSync(overlayPositionsPath(), 'utf8');
+    return JSON.parse(data);
+  } catch { return {}; }
+}
+function saveOverlayPositions() {
+  try {
+    const pos = {};
+    if (overlayWin && !overlayWin.isDestroyed()) pos.audio = overlayWin.getBounds();
+    if (motorWin   && !motorWin.isDestroyed())   pos.motor = motorWin.getBounds();
+    fs.writeFileSync(overlayPositionsPath(), JSON.stringify(pos));
+  } catch { }
+}
+
 function makeOverlayWindow(url, x, y, width, height) {
   const win = new BrowserWindow({
     width, height, x, y,
     transparent: true, frame: false,
+    backgroundColor: '#00000000',
     alwaysOnTop: true, skipTaskbar: true,
     focusable: false, hasShadow: false,
     webPreferences: {
@@ -34,10 +54,17 @@ function makeOverlayWindow(url, x, y, width, height) {
 function createOverlays() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 
+  const MOTOR_W = 142, MOTOR_H = 142;
+  const AUDIO_W = 210, AUDIO_H = 34;
+
+  const saved = loadOverlayPositions();
+  const audioPos = saved.audio || { x: width - AUDIO_W, y: 0 };
+  const motorPos = saved.motor || { x: width - MOTOR_W - AUDIO_W - 8, y: 0 };
+
   if (!overlayWin) {
     overlayWin = makeOverlayWindow(
       MAIN_WINDOW_WEBPACK_ENTRY + '#/overlay',
-      width - 172, height - 56, 160, 44
+      audioPos.x, audioPos.y, AUDIO_W, AUDIO_H
     );
     overlayWin.on('closed', () => { overlayWin = null; setOverlayWindow(null); });
     setOverlayWindow(overlayWin);
@@ -46,7 +73,7 @@ function createOverlays() {
   if (!motorWin) {
     motorWin = makeOverlayWindow(
       MAIN_WINDOW_WEBPACK_ENTRY + '#/motor-overlay',
-      width - 160, 16, 148, 110
+      motorPos.x, motorPos.y, MOTOR_W, MOTOR_H
     );
     motorWin.on('closed', () => { motorWin = null; setMotorWindow(null); });
     setMotorWindow(motorWin);
@@ -101,6 +128,43 @@ app.whenReady().then(async () => {
 
     // Register all IPC handlers (pass mainWindow getter)
     registerIpcHandlers(ipcMain, () => mainWindow);
+
+    // Overlay positioning
+    ipcMain.handle('overlay:setPosition', (_e, { audio, motor }) => {
+      if (audio && overlayWin && !overlayWin.isDestroyed()) overlayWin.setPosition(audio.x, audio.y);
+      if (motor && motorWin  && !motorWin.isDestroyed())   motorWin.setPosition(motor.x, motor.y);
+      saveOverlayPositions();
+    });
+    ipcMain.handle('overlay:getPosition', () => {
+      return {
+        audio: overlayWin && !overlayWin.isDestroyed() ? overlayWin.getPosition() : null,
+        motor: motorWin   && !motorWin.isDestroyed()   ? motorWin.getPosition()   : null,
+      };
+    });
+
+    // Always create overlays so user can position them at any time
+    createOverlays();
+
+    // Overlay move mode IPC
+    ipcMain.handle('overlay:startMove', () => {
+      [overlayWin, motorWin].forEach(win => {
+        if (win && !win.isDestroyed()) {
+          win.setIgnoreMouseEvents(false);
+          win.setFocusable(true);
+          win.webContents.send('overlay:dragMode', true);
+        }
+      });
+    });
+    ipcMain.handle('overlay:stopMove', () => {
+      [overlayWin, motorWin].forEach(win => {
+        if (win && !win.isDestroyed()) {
+          win.setIgnoreMouseEvents(true);
+          win.setFocusable(false);
+          win.webContents.send('overlay:dragMode', false);
+        }
+      });
+      saveOverlayPositions();
+    });
 
     // Start game detector
     gameDetector = new GameDetector({ pollIntervalMs: 3000 });

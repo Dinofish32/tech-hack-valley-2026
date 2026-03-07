@@ -13,7 +13,7 @@ export const usePipelineStore = create((set) => ({
     sampleRate: 48000,
     bufferSize: 2048,
     useOnnxSeparator: false,
-    hfThreshold: 0.04,
+    hfThreshold: 0.20,
     confidenceThreshold: 0.4,
     enabledCategories: ['GUNSHOT', 'FOOTSTEP', 'EXPLOSION', 'ABILITY', 'RELOAD', 'ALERT', 'UNKNOWN'],
   },

@@ -7,77 +7,83 @@ const CATEGORY_COLORS = {
   ABILITY:   '#A855F7',
   RELOAD:    '#3B82F6',
   ALERT:     '#EC4899',
-  UNKNOWN:   '#64748B',
+  UNKNOWN:   '#6366F1',
 };
 
 const FADE_MS = 400;
+const CELL = 44;
+const GAP  = 4;
 
 export default function MotorOverlay() {
   const [motors, setMotors] = useState({ N: 0, E: 0, S: 0, W: 0 });
-  const [color, setColor]   = useState('#64748B');
-  const [label, setLabel]   = useState('');
+  const [color, setColor]   = useState('#6366F1');
+  const [dragMode, setDragMode] = useState(false);
   const fadeTimer = useRef(null);
 
   useEffect(() => {
     const api = window.electronAPI;
     if (!api) return;
+    api.overlay?.onDragMode((mode) => setDragMode(mode));
     api.pipeline.onCommand((cmd) => {
-      setMotors(cmd.motors);
-      setColor(CATEGORY_COLORS[cmd.waveform] || '#64748B');
-      setLabel(cmd.waveform || '');
+      // Only show motors >= 50% of the peak value — suppresses artifact spikes
+      // in the opposite direction while preserving true diagonals (NE, NW, etc.)
+      const raw = cmd.motors;
+      const peak = Math.max(raw.N, raw.E, raw.S, raw.W);
+      const cutoff = peak * 0.5;
+      setMotors({
+        N: raw.N >= cutoff ? raw.N : 0,
+        E: raw.E >= cutoff ? raw.E : 0,
+        S: raw.S >= cutoff ? raw.S : 0,
+        W: raw.W >= cutoff ? raw.W : 0,
+      });
+      setColor(CATEGORY_COLORS[cmd.waveform] || '#6366F1');
       if (fadeTimer.current) clearTimeout(fadeTimer.current);
-      fadeTimer.current = setTimeout(() => {
-        setMotors({ N: 0, E: 0, S: 0, W: 0 });
-        setLabel('');
-      }, FADE_MS);
+      fadeTimer.current = setTimeout(() => setMotors({ N: 0, E: 0, S: 0, W: 0 }), FADE_MS);
     });
   }, []);
 
-  const bar = (dir) => {
-    const v = (motors[dir] || 0) / 255;
+  const cell = (dir) => {
+    const v   = (motors[dir] || 0) / 255;
+    const pct = Math.round(v * 100);
+    const hexA = Math.round(v * 210).toString(16).padStart(2, '0');
+    const active = v > 0.02;
+
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ width: 12, color: '#6B7280', fontSize: 10, fontFamily: 'monospace' }}>{dir}</span>
-        <div style={{ width: 70, height: 7, background: '#1E2A45', borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{
-            width: `${v * 100}%`, height: '100%',
-            background: v > 0.05 ? color : '#1E2A45',
-            boxShadow: v > 0.1 ? `0 0 6px ${color}88` : 'none',
-            transition: 'width 0.05s',
-          }} />
-        </div>
-        <span style={{ width: 24, textAlign: 'right', fontSize: 10, fontFamily: 'monospace',
-          color: v > 0.05 ? '#E5E7EB' : '#374151' }}>
-          {Math.round(v * 100)}
-        </span>
+      <div style={{
+        width: CELL, height: CELL,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        borderRadius: 7,
+        background: active ? `${color}${hexA}` : 'rgba(255,255,255,0.05)',
+        border: `1px solid ${active ? color + '88' : 'rgba(255,255,255,0.08)'}`,
+        boxShadow: v > 0.25 ? `0 0 10px ${color}55` : 'none',
+        transition: 'background 0.08s, box-shadow 0.08s',
+      }}>
+        <span style={{ fontSize: 9, fontFamily: 'monospace', fontWeight: 700,
+          color: active ? '#ffffffaa' : '#ffffff18', letterSpacing: 1 }}>{dir}</span>
+        <span style={{ fontSize: 16, fontFamily: 'monospace', fontWeight: 800, lineHeight: 1,
+          color: active ? '#fff' : '#ffffff15' }}>{pct}</span>
       </div>
     );
   };
 
   return (
-    <div style={{
-      position: 'fixed', top: 16, right: 16,
-      background: 'rgba(10,15,30,0.85)',
-      border: '1px solid rgba(255,255,255,0.1)',
-      borderRadius: 8, padding: '8px 12px',
-      userSelect: 'none', backdropFilter: 'blur(4px)',
-      minWidth: 130,
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <span style={{ fontSize: 10, color: '#6B7280', fontFamily: 'monospace' }}>MOTORS</span>
-        {label && (
-          <span style={{ fontSize: 9, color: color, fontFamily: 'monospace',
-            background: `${color}22`, borderRadius: 3, padding: '1px 5px' }}>
-            {label}
-          </span>
-        )}
+    <>
+      <style>{`html,body{background:transparent!important;margin:0;padding:0;overflow:hidden}`}</style>
+      <div style={{
+        display: 'grid', gridTemplateColumns: `${CELL}px ${CELL}px ${CELL}px`, gap: GAP,
+        position: 'fixed', top: 0, left: 0, userSelect: 'none',
+        WebkitAppRegion: dragMode ? 'drag' : 'no-drag',
+        outline: dragMode ? '2px dashed rgba(99,102,241,0.8)' : 'none',
+      }}>
+        <div />{cell('N')}<div />
+        {cell('W')}
+        <div style={{ width: CELL, height: CELL, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(255,255,255,0.2)' }} />
+        </div>
+        {cell('E')}
+        <div />{cell('S')}<div />
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {bar('N')}
-        {bar('E')}
-        {bar('S')}
-        {bar('W')}
-      </div>
-    </div>
+    </>
   );
 }

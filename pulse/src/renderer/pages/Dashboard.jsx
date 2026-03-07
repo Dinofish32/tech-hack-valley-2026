@@ -73,6 +73,7 @@ function SimPanel({ addCommand, addEvent }) {
 
 export default function Dashboard() {
   const { running, setRunning, metrics, detectedGame, config, audioLevel } = usePipelineStore();
+  const [movingOverlays, setMovingOverlays] = useState(false);
   const transport = useDeviceStore((s) => s.transport);
   const addCommand = useDeviceStore((s) => s.addCommand);
   const events = useEventLogStore((s) => s.events);
@@ -81,6 +82,17 @@ export default function Dashboard() {
   const profiles = useProfileStore((s) => s.profiles);
 
   const activeProfile = profiles.find((p) => p.id === activeProfileId);
+
+  async function toggleOverlayMove() {
+    if (!window.electronAPI?.overlay) return;
+    if (movingOverlays) {
+      await window.electronAPI.overlay.stopMove();
+      setMovingOverlays(false);
+    } else {
+      await window.electronAPI.overlay.startMove();
+      setMovingOverlays(true);
+    }
+  }
 
   async function togglePipeline() {
     if (!window.electronAPI) return;
@@ -105,6 +117,16 @@ export default function Dashboard() {
               {activeProfile && ` — ${activeProfile.name}`}
             </div>
           )}
+          <button
+            onClick={toggleOverlayMove}
+            className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${
+              movingOverlays
+                ? 'bg-indigo-500 text-white hover:bg-indigo-400'
+                : 'bg-white/5 text-text-muted hover:bg-white/10'
+            }`}
+          >
+            {movingOverlays ? 'Lock Overlays' : 'Move Overlays'}
+          </button>
           <button
             onClick={togglePipeline}
             className={`px-5 py-2 rounded-lg font-semibold text-sm transition-colors ${
