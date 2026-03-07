@@ -4,7 +4,7 @@ class DirectionDecoder {
   /**
    * @param {{ hfThreshold?: number, hfBandLow?: number, hfBandHigh?: number, sampleRate?: number }} opts
    */
-  constructor({ hfThreshold = 0.65, hfBandLow = 8000, hfBandHigh = 12000, sampleRate = 48000 } = {}) {
+  constructor({ hfThreshold = 0.04, hfBandLow = 8000, hfBandHigh = 12000, sampleRate = 48000 } = {}) {
     this.hfThreshold = hfThreshold;
     this.hfBandLow = hfBandLow;
     this.hfBandHigh = hfBandHigh;
@@ -31,10 +31,16 @@ class DirectionDecoder {
     const combined = this._mix(leftWaveform, rightWaveform);
     const hfRatio = this._hfRatio(combined);
     const front = hfRatio > this.hfThreshold;
-    const fbConfidence = Math.abs(hfRatio - 0.5) * 2; // 0=ambiguous, 1=certain
+    const fbConfidence = Math.abs(hfRatio - 0.5) * 2;
 
     // Step 3 — Map to 8 directions
     const direction = this._mapDirection(front, lrBucket, pan);
+
+    // Debug — remove once tuned
+    if (this._debugCounter === undefined) this._debugCounter = 0;
+    if (++this._debugCounter % 5 === 0) {
+      console.log(`[DD] pan=${pan.toFixed(3)} bucket=${lrBucket} hfRatio=${hfRatio.toFixed(4)} threshold=${this.hfThreshold} front=${front} → ${direction}`);
+    }
 
     return { direction, lrConfidence, fbConfidence, pan };
   }
@@ -63,35 +69,30 @@ class DirectionDecoder {
   }
 
   /**
-   * Compute ratio of energy in HF band (hfBandLow–hfBandHigh) to total energy.
-   * Uses a simple FFT-free approximation: bandpass via squared difference.
-   * For accuracy, we use a DFT magnitude approximation at target frequencies.
+   * Estimate ratio of high-frequency energy to total energy using a
+   * first-difference highpass filter. For sample x[n], the difference
+   * d[n] = x[n] - x[n-1] acts as a highpass whose gain scales with
+   * frequency, so hfEnergy/totalEnergy is high for HF-rich (front)
+   * sounds and low for LF-dominated (back/occluded) sounds.
    */
   _hfRatio(signal) {
-    if (signal.length === 0) return 0;
-
-    // Compute energy in HF band vs total using Goertzel-like estimation
     const N = signal.length;
+    if (N < 2) return 0;
+
     let totalEnergy = 0;
     let hfEnergy = 0;
 
-    // Total energy
     for (let i = 0; i < N; i++) totalEnergy += signal[i] * signal[i];
-
     if (totalEnergy < 1e-12) return 0;
 
-    // HF energy: estimate via bandpass using finite differences (approximates high-freq content)
-    // Simple approach: correlate with cosines at band center
-    const fCenter = (this.hfBandLow + this.hfBandHigh) / 2;
-    const omega = (2 * Math.PI * fCenter) / this.sampleRate;
-    let re = 0, im = 0;
-    for (let i = 0; i < N; i++) {
-      re += signal[i] * Math.cos(omega * i);
-      im += signal[i] * Math.sin(omega * i);
+    for (let i = 1; i < N; i++) {
+      const d = signal[i] - signal[i - 1];
+      hfEnergy += d * d;
     }
-    hfEnergy = (re * re + im * im) / N;
 
-    return hfEnergy / (totalEnergy + 1e-9);
+    // For typical game audio (mostly <8kHz), the first-difference filter gives
+    // hfEnergy/totalEnergy in roughly 0.05–0.6 range.  Clamp to [0,1] directly.
+    return Math.min(1, hfEnergy / (totalEnergy + 1e-9));
   }
 
   /**
@@ -127,7 +128,7 @@ class DirectionDecoder {
       switch (lrBucket) {
         case 'hard_left':  return Direction.SW;
         case 'left':       return Direction.SW;
-        case 'center':     return Direction.S;
+        case 'center':     return Direction.N; // can't distinguish front/back for center sounds; default forward
         case 'right':      return Direction.SE;
         case 'hard_right': return Direction.SE;
       }

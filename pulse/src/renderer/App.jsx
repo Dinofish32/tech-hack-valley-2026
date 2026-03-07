@@ -8,6 +8,7 @@ import EventLog from './pages/EventLog';
 import Settings from './pages/Settings';
 import PatternEditor from './pages/PatternEditor';
 import Overlay from './pages/Overlay';
+import MotorOverlay from './pages/MotorOverlay';
 import { usePipelineStore } from './store/usePipelineStore';
 import { useDeviceStore } from './store/useDeviceStore';
 import { useEventLogStore } from './store/useEventLogStore';
@@ -37,9 +38,8 @@ export default function App() {
   }, []);
 
   // Overlay window loads this same bundle with #/overlay hash
-  if (window.location.hash === '#/overlay') {
-    return <Overlay />;
-  }
+  if (window.location.hash === '#/overlay') return <Overlay />;
+  if (window.location.hash === '#/motor-overlay') return <MotorOverlay />;
 
   return (
     <HashRouter>

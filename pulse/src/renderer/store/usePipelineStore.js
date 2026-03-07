@@ -11,9 +11,9 @@ export const usePipelineStore = create((set) => ({
   },
   config: {
     sampleRate: 48000,
-    bufferSize: 512,
+    bufferSize: 2048,
     useOnnxSeparator: false,
-    hfThreshold: 0.65,
+    hfThreshold: 0.04,
     confidenceThreshold: 0.4,
     enabledCategories: ['GUNSHOT', 'FOOTSTEP', 'EXPLOSION', 'ABILITY', 'RELOAD', 'ALERT', 'UNKNOWN'],
   },

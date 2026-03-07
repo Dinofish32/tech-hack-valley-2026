@@ -9,7 +9,7 @@ const EXE_PATH = path.join(__dirname, '../../wasapi_capture.exe');
 const BYTES_PER_SAMPLE = 4;           // float32
 const CHANNELS         = 2;           // always L + R out
 const BYTES_PER_FRAME  = CHANNELS * BYTES_PER_SAMPLE;
-const CHUNK_FRAMES     = 512;
+const CHUNK_FRAMES     = 2048;
 const CHUNK_BYTES      = CHUNK_FRAMES * BYTES_PER_FRAME;
 
 /**

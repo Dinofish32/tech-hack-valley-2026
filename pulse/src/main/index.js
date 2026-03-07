@@ -1,23 +1,21 @@
 const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
 const { init: initDb } = require('./db');
-const { registerIpcHandlers, setActiveGamePid, setOverlayWindow } = require('./ipc');
+const { registerIpcHandlers, setActiveGamePid, setOverlayWindow, setMotorWindow } = require('./ipc');
 const GameDetector = require('./gameDetector');
 
 // Handle Squirrel startup events on Windows
 if (require('electron-squirrel-startup')) app.quit();
 
-let mainWindow   = null;
-let overlayWin   = null;
-let gameDetector = null;
+let mainWindow    = null;
+let overlayWin    = null;
+let motorWin      = null;
+let gameDetector  = null;
 let activeGamePid = null;
 
-function createOverlay() {
-  if (overlayWin) return;
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  overlayWin = new BrowserWindow({
-    width: 160, height: 44,
-    x: width - 172, y: height - 56,
+function makeOverlayWindow(url, x, y, width, height) {
+  const win = new BrowserWindow({
+    width, height, x, y,
     transparent: true, frame: false,
     alwaysOnTop: true, skipTaskbar: true,
     focusable: false, hasShadow: false,
@@ -27,17 +25,40 @@ function createOverlay() {
       nodeIntegration: false,
     },
   });
-  overlayWin.setAlwaysOnTop(true, 'screen-saver');
-  overlayWin.setIgnoreMouseEvents(true);
-  overlayWin.loadURL(MAIN_WINDOW_WEBPACK_ENTRY + '#/overlay');
-  overlayWin.on('closed', () => { overlayWin = null; setOverlayWindow(null); });
-  setOverlayWindow(overlayWin);
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.setIgnoreMouseEvents(true);
+  win.loadURL(url);
+  return win;
 }
 
-function destroyOverlay() {
+function createOverlays() {
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+
+  if (!overlayWin) {
+    overlayWin = makeOverlayWindow(
+      MAIN_WINDOW_WEBPACK_ENTRY + '#/overlay',
+      width - 172, height - 56, 160, 44
+    );
+    overlayWin.on('closed', () => { overlayWin = null; setOverlayWindow(null); });
+    setOverlayWindow(overlayWin);
+  }
+
+  if (!motorWin) {
+    motorWin = makeOverlayWindow(
+      MAIN_WINDOW_WEBPACK_ENTRY + '#/motor-overlay',
+      width - 160, 16, 148, 110
+    );
+    motorWin.on('closed', () => { motorWin = null; setMotorWindow(null); });
+    setMotorWindow(motorWin);
+  }
+}
+
+function destroyOverlays() {
   if (overlayWin && !overlayWin.isDestroyed()) overlayWin.close();
   overlayWin = null;
   setOverlayWindow(null);
+  if (motorWin && !motorWin.isDestroyed()) motorWin.close();
+  motorWin = null;
 }
 
 function createWindow() {
@@ -86,13 +107,13 @@ app.whenReady().then(async () => {
     gameDetector.on('game:detected', ({ processName, profileId, pid }) => {
       activeGamePid = pid || null;
       setActiveGamePid(activeGamePid);
-      createOverlay();
+      createOverlays();
       if (mainWindow) mainWindow.webContents.send('game:detected', { processName, profileId, pid });
     });
     gameDetector.on('game:lost', () => {
       activeGamePid = null;
       setActiveGamePid(null);
-      destroyOverlay();
+      destroyOverlays();
     });
     gameDetector.start();
   } catch (err) {

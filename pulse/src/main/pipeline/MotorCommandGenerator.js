@@ -36,7 +36,7 @@ class MotorCommandGenerator {
 
     // Step 2 — intensity scaling (log scale)
     let scale = Math.log10(1 + 9 * (event.intensityRms || 0));
-    scale = Math.max(0.1, Math.min(1.0, scale));
+    scale = Math.max(0, Math.min(1.0, scale));
 
     // Step 3 — pack to uint8
     const motors = {

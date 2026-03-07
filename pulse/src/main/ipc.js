@@ -11,8 +11,10 @@ let transport     = null;
 let getWindow     = null;
 let activeGamePid = null;
 let overlayWindow = null;
+let motorWindow   = null;
 
 function setOverlayWindow(win) { overlayWindow = win; }
+function setMotorWindow(win)   { motorWindow = win; }
 
 /** Called by index.js when GameDetector fires game:detected / game:lost */
 function setActiveGamePid(pid) {
@@ -23,6 +25,7 @@ function send(channel, data) {
   const win = getWindow();
   if (win && !win.isDestroyed()) win.webContents.send(channel, data);
   if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.webContents.send(channel, data);
+  if (motorWindow && !motorWindow.isDestroyed()) motorWindow.webContents.send(channel, data);
 }
 
 /**
@@ -278,4 +281,4 @@ function registerIpcHandlers(ipcMain, windowGetter) {
   });
 }
 
-module.exports = { registerIpcHandlers, setActiveGamePid, setOverlayWindow };
+module.exports = { registerIpcHandlers, setActiveGamePid, setOverlayWindow, setMotorWindow };

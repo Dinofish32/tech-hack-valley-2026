@@ -45,7 +45,13 @@ class SourceSeparator {
       if (this._onnxSession) {
         return this._separateOnnx(audioBuffer);
       }
-      return this._separateNmf(audioBuffer);
+      // Without an ONNX model, pass the raw stereo through directly.
+      // The L/R channels already carry direction information for DirectionDecoder.
+      return [{
+        leftWaveform: audioBuffer.left,
+        rightWaveform: audioBuffer.right,
+        sourceIndex: 0,
+      }];
     } catch (err) {
       console.warn('[SourceSeparator] process error, returning mixed as single source:', err.message);
       return [{

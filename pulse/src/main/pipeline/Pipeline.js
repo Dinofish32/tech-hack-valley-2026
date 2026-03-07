@@ -46,9 +46,9 @@ class Pipeline extends EventEmitter {
   _mergeDefaults(config) {
     return {
       sampleRate: 48000,
-      bufferSize: 512,
+      bufferSize: 2048,
       useOnnxSeparator: false,
-      hfThreshold: 0.65,
+      hfThreshold: 0.04,
       priorityMap: { ...DEFAULT_PRIORITY },
       enabledCategories: ['GUNSHOT', 'FOOTSTEP', 'EXPLOSION', 'ABILITY', 'RELOAD', 'ALERT', 'UNKNOWN'],
       confidenceThreshold: 0.4,
@@ -72,7 +72,7 @@ class Pipeline extends EventEmitter {
       });
 
       this._onsetDetector = new OnsetDetector({
-        threshold: 0.3,
+        threshold: 0.15,
         debounceMs: 30,
         sampleRate: cfg.sampleRate,
       });
@@ -264,6 +264,9 @@ class Pipeline extends EventEmitter {
 
       // Compute RMS intensity
       const intensityRms = this._computeRms(source.leftWaveform, source.rightWaveform);
+
+      // Gate: ignore near-silent buffers (ambient noise false triggers)
+      if (intensityRms < 0.003) return;
 
       // Assemble AudioEvent
       const event = {
