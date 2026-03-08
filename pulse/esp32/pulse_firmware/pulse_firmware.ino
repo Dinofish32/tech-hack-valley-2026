@@ -20,13 +20,9 @@ const int PIN_W[2] = {  4,  5 };
 const int ALL_PINS[8] = {  6,  7, 18, 19, 2, 3, 4, 5 };
 
 // ── waveformId values (must match packetSchema.js WAVEFORM_IDS) ───────────
-const uint8_t WF_GUNSHOT   = 0x00;
-const uint8_t WF_FOOTSTEP  = 0x01;
-const uint8_t WF_EXPLOSION = 0x02;
-const uint8_t WF_ABILITY   = 0x03;
-const uint8_t WF_ALERT     = 0x04;
-const uint8_t WF_RELOAD    = 0x05;
-const uint8_t WF_STOP      = 0xFF;
+const uint8_t WF_GUNSHOT  = 0x00;
+const uint8_t WF_FOOTSTEP = 0x01;
+const uint8_t WF_STOP     = 0xFF;
 
 // ── PWM (ESP32 LEDC, core 3.x API) ───────────────────────────────────────
 const int PWM_FREQ       = 5000;
@@ -48,14 +44,10 @@ void allOff() {
 
 const char* waveformName(uint8_t id) {
   switch (id) {
-    case WF_GUNSHOT:   return "GUNSHOT";
-    case WF_FOOTSTEP:  return "FOOTSTEP";
-    case WF_EXPLOSION: return "EXPLOSION";
-    case WF_ABILITY:   return "ABILITY";
-    case WF_ALERT:     return "ALERT";
-    case WF_RELOAD:    return "RELOAD";
-    case WF_STOP:      return "STOP";
-    default:           return "UNKNOWN";
+    case WF_GUNSHOT:  return "GUNSHOT";
+    case WF_FOOTSTEP: return "FOOTSTEP";
+    case WF_STOP:     return "STOP";
+    default:          return "UNKNOWN";
   }
 }
 
