@@ -3,22 +3,34 @@
 //
 // On first boot, open Serial Monitor and copy the MAC address printed.
 // Paste it into HEADBAND_MAC in dongle.ino, then flash the dongle.
+//
+// Pin layout (per direction):
+//   [0] = footstep GPIO, [1] = gunshot GPIO
 // ─────────────────────────────────────────────────────────────────────────────
 #include <esp_now.h>
 #include <WiFi.h>
 
-// ── Motor GPIO pins — adjust to your wiring ───────────────────────────────
-const int PIN_N = 5;
-const int PIN_E = 18;
-const int PIN_S = 19;
-const int PIN_W = 21;
+// ── Motor GPIO pins [footstep, gunshot] ───────────────────────────────────
+const int PIN_N[2] = { 12, 13 };
+const int PIN_S[2] = { 18, 19 };
+const int PIN_E[2] = {  2,  3 };
+const int PIN_W[2] = {  4,  5 };
 
-// ── PWM (ESP32 LEDC) ─────────────────────────────────────────────────────
+// Flat array for iteration: N_foot, N_gun, S_foot, S_gun, E_foot, E_gun, W_foot, W_gun
+const int ALL_PINS[8] = { 12, 13, 18, 19, 2, 3, 4, 5 };
+
+// ── waveformId values (must match constants.js) ───────────────────────────
+const uint8_t WF_GUNSHOT  = 1;
+const uint8_t WF_FOOTSTEP = 2;
+const uint8_t WF_STOP     = 0xFF;
+
+// ── PWM (ESP32 LEDC, core 3.x API) ───────────────────────────────────────
 const int PWM_FREQ       = 5000;
 const int PWM_RESOLUTION = 8;   // 8-bit: 0–255
-const int CH_N = 0, CH_E = 1, CH_S = 2, CH_W = 3;
+// Channels 0–7, one per pin
+// N_foot=0, N_gun=1, S_foot=2, S_gun=3, E_foot=4, E_gun=5, W_foot=6, W_gun=7
 
-// ── Failsafe: motors off if no packet received for this long ─────────────
+// ── Failsafe: motors off if no packet received for this long ──────────────
 const unsigned long FAILSAFE_MS = 500;
 
 // ── State ─────────────────────────────────────────────────────────────────
@@ -27,10 +39,7 @@ unsigned long motorOffAt   = 0;
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 void allOff() {
-  ledcWrite(CH_N, 0);
-  ledcWrite(CH_E, 0);
-  ledcWrite(CH_S, 0);
-  ledcWrite(CH_W, 0);
+  for (int i = 0; i < 8; i++) ledcWrite(ALL_PINS[i], 0);
 }
 
 void handlePacket(const uint8_t* data, int len) {
@@ -47,27 +56,34 @@ void handlePacket(const uint8_t* data, int len) {
   uint8_t  waveformId = data[4];
   uint16_t durationMs = ((uint16_t)data[5] << 8) | data[6];
 
-  // 0xFF = STOP command
-  if (waveformId == 0xFF) {
+  if (waveformId == WF_STOP) {
     allOff();
     motorOffAt = 0;
     return;
   }
 
-  ledcWrite(CH_N, data[0]);
-  ledcWrite(CH_E, data[1]);
-  ledcWrite(CH_S, data[2]);
-  ledcWrite(CH_W, data[3]);
+  // Select pin index: 0=footstep, 1=gunshot
+  int idx = (waveformId == WF_GUNSHOT) ? 1 : 0;
+
+  // data[0..3] = duty for N, E, S, W
+  ledcWrite(PIN_N[idx], data[0]);
+  ledcWrite(PIN_E[idx], data[1]);
+  ledcWrite(PIN_S[idx], data[2]);
+  ledcWrite(PIN_W[idx], data[3]);
+
+  // Turn off the opposite type (don't mix footstep + gunshot simultaneously)
+  int other = 1 - idx;
+  ledcWrite(PIN_N[other], 0);
+  ledcWrite(PIN_E[other], 0);
+  ledcWrite(PIN_S[other], 0);
+  ledcWrite(PIN_W[other], 0);
 
   motorOffAt   = millis() + durationMs;
   lastPacketMs = millis();
 }
 
-// ── ESP-NOW receive callback ──────────────────────────────────────────────
-// Note: if you get a compile error here, your ESP32 Arduino core is >= 3.0
-// Replace the signature with:
-//   void onReceive(const esp_now_recv_info_t *info, const uint8_t *data, int len)
-void onReceive(const uint8_t* mac, const uint8_t* data, int len) {
+// ── ESP-NOW receive callback (core 3.x signature) ─────────────────────────
+void onReceive(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
   handlePacket(data, len);
 }
 
@@ -75,11 +91,10 @@ void onReceive(const uint8_t* mac, const uint8_t* data, int len) {
 void setup() {
   Serial.begin(115200);
 
-  // PWM setup
-  ledcSetup(CH_N, PWM_FREQ, PWM_RESOLUTION); ledcAttachPin(PIN_N, CH_N);
-  ledcSetup(CH_E, PWM_FREQ, PWM_RESOLUTION); ledcAttachPin(PIN_E, CH_E);
-  ledcSetup(CH_S, PWM_FREQ, PWM_RESOLUTION); ledcAttachPin(PIN_S, CH_S);
-  ledcSetup(CH_W, PWM_FREQ, PWM_RESOLUTION); ledcAttachPin(PIN_W, CH_W);
+  // PWM setup — core 3.x: ledcAttachChannel(pin, freq, resolution, channel)
+  for (int i = 0; i < 8; i++) {
+    ledcAttachChannel(ALL_PINS[i], PWM_FREQ, PWM_RESOLUTION, i);
+  }
   allOff();
 
   // ESP-NOW — STA mode, no AP connection needed
@@ -101,7 +116,7 @@ void setup() {
   lastPacketMs = millis();
 }
 
-// ── Loop ─────────────────────────────────────────────────────────────────
+// ── Loop ──────────────────────────────────────────────────────────────────
 void loop() {
   unsigned long now = millis();
 
@@ -111,7 +126,7 @@ void loop() {
     motorOffAt = 0;
   }
 
-  // Failsafe: if the PC stops sending for too long, kill motors
+  // Failsafe: if PC stops sending for too long, kill motors
   if ((now - lastPacketMs) > FAILSAFE_MS) {
     allOff();
     lastPacketMs = now;

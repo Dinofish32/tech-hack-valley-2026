@@ -6,7 +6,6 @@ import Profiles from './pages/Profiles';
 import Calibration from './pages/Calibration';
 import EventLog from './pages/EventLog';
 import Settings from './pages/Settings';
-import PatternEditor from './pages/PatternEditor';
 import Overlay from './pages/Overlay';
 import MotorOverlay from './pages/MotorOverlay';
 import { usePipelineStore } from './store/usePipelineStore';
@@ -52,7 +51,6 @@ export default function App() {
             <Route path="/profiles" element={<Profiles />} />
             <Route path="/calibration" element={<Calibration />} />
             <Route path="/eventlog" element={<EventLog />} />
-            <Route path="/patterns" element={<PatternEditor />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>

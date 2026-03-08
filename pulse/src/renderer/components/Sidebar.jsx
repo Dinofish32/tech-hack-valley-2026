@@ -8,7 +8,6 @@ const NAV = [
   { to: '/profiles',    label: 'Profiles'        },
   { to: '/calibration', label: 'Calibration'     },
   { to: '/eventlog',    label: 'Event Log'       },
-  { to: '/patterns',    label: 'Pattern Editor'  },
   { to: '/settings',    label: 'Settings'        },
 ];
 

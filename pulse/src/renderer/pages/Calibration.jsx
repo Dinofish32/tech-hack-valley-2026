@@ -132,8 +132,12 @@
 //   );
 // }
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import WaveformCanvas from '../components/WaveformCanvas';
+
+const PATTERNS_KEY    = 'puls8_calibration_patterns';
+const STEP_KEY        = 'puls8_calibration_step';
+const INTENSITIES_KEY = 'puls8_calibration_intensities';
 
 const MOTORS = ['N', 'E', 'S', 'W'];
 const MOTOR_LABELS = { N: 'North (Forehead)', E: 'East (Right Temple)', S: 'South (Back)', W: 'West (Left Temple)' };
@@ -148,7 +152,14 @@ const DEFAULT_PATTERNS = {
 const TOTAL_STEPS = 4;
 
 export default function Calibration() {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(() => {
+    const saved = parseInt(localStorage.getItem(STEP_KEY), 10);
+    return saved >= 1 && saved <= TOTAL_STEPS ? saved : 1;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STEP_KEY, String(step));
+  }, [step]);
 
   return (
     <div className="p-6 max-w-2xl">
@@ -180,8 +191,19 @@ export default function Calibration() {
 
 /* ─── Step 1: Motor Test ─────────────────────────────────────────────────── */
 function Step1({ onNext }) {
-  const [intensities, setIntensities] = useState({ N: 200, E: 200, S: 200, W: 200 });
+  const [intensities, setIntensities] = useState(() => {
+    try {
+      const saved = localStorage.getItem(INTENSITIES_KEY);
+      return saved ? JSON.parse(saved) : { N: 200, E: 200, S: 200, W: 200 };
+    } catch {
+      return { N: 200, E: 200, S: 200, W: 200 };
+    }
+  });
   const [confirmed, setConfirmed] = useState({});
+
+  useEffect(() => {
+    localStorage.setItem(INTENSITIES_KEY, JSON.stringify(intensities));
+  }, [intensities]);
 
   const fire = async (motor) => {
     if (!window.electronAPI) return;
@@ -355,7 +377,18 @@ function Step3({ onNext, onBack }) {
 /* ─── Step 4: Pattern Editor (merged from PatternEditor.jsx) ─────────────── */
 function Step4({ onBack }) {
   const [selectedCategory, setSelectedCategory] = useState('GUNSHOT');
-  const [patterns, setPatterns] = useState({ ...DEFAULT_PATTERNS });
+  const [patterns, setPatterns] = useState(() => {
+    try {
+      const saved = localStorage.getItem(PATTERNS_KEY);
+      return saved ? { ...DEFAULT_PATTERNS, ...JSON.parse(saved) } : { ...DEFAULT_PATTERNS };
+    } catch {
+      return { ...DEFAULT_PATTERNS };
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem(PATTERNS_KEY, JSON.stringify(patterns));
+  }, [patterns]);
 
   const segs = patterns[selectedCategory] || [];
 
@@ -392,6 +425,8 @@ function Step4({ onBack }) {
   };
 
   const saveAndFinish = async () => {
+    localStorage.setItem(PATTERNS_KEY, JSON.stringify(patterns));
+    localStorage.removeItem(STEP_KEY); // reset wizard to step 1 on next visit
     if (window.electronAPI?.calibration?.savePatterns) {
       await window.electronAPI.calibration.savePatterns(patterns);
     }
