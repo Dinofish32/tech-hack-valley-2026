@@ -11,7 +11,7 @@ export default function Calibration() {
   return (
     <div className="p-6 max-w-2xl">
       <h1 className="text-xl font-bold mb-2">Calibration</h1>
-      <p className="text-text-muted text-sm mb-6">3-step wizard to configure your Puls8 headband.</p>
+      <p className="text-text-muted text-sm mb-6">3-step wizard to configure your Pulse8 headband.</p>
 
       {/* Step indicator */}
       <div className="flex gap-2 mb-8">

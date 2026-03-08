@@ -178,9 +178,9 @@ export default function Dashboard() {
       <SimPanel addCommand={addCommand} addEvent={addEvent} />
 
       {/* Live event ticker */}
-      <div className="bg-surface rounded-xl p-4">
-        <div className="text-xs text-text-muted uppercase tracking-wider font-semibold mb-3">Recent Events</div>
-        <div className="flex flex-col gap-1">
+      <div className="bg-surface rounded-xl p-4 flex flex-col flex-shrink-0" style={{ height: 220 }}>
+        <div className="text-xs text-text-muted uppercase tracking-wider font-semibold mb-3 flex-shrink-0">Recent Events</div>
+        <div className="flex flex-col gap-1 overflow-y-auto">
           {events.slice(0, 5).map((e, i) => (
             <EventCard key={e.id || i} event={e} />
           ))}
