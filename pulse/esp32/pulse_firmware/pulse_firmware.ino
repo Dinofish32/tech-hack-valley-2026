@@ -85,6 +85,9 @@ void handlePacket(const uint8_t* data, int len) {
 
   // Drive direction LEDs with PWM intensity from packet
   allOff();
+  Serial.printf("[LED] ch=%d  pins N=%d E=%d S=%d W=%d  vals %d %d %d %d\n",
+    ch, PIN_N[ch], PIN_E[ch], PIN_S[ch], PIN_W[ch],
+    data[0], data[1], data[2], data[3]);
   ledcWrite(PIN_N[ch], data[0]);
   ledcWrite(PIN_E[ch], data[1]);
   ledcWrite(PIN_S[ch], data[2]);
