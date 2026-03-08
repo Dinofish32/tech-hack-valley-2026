@@ -2,13 +2,8 @@ const { DIRECTION_DEGREES, EventCategory } = require('../../shared/constants');
 const { buildPacket } = require('../../shared/packetSchema');
 
 const WAVEFORM_DEFAULTS = {
-  [EventCategory.GUNSHOT]:   { id: 'GUNSHOT',   durationMs: 30  },
-  [EventCategory.FOOTSTEP]:  { id: 'FOOTSTEP',  durationMs: 60  },
-  [EventCategory.EXPLOSION]: { id: 'EXPLOSION', durationMs: 400 },
-  [EventCategory.ABILITY]:   { id: 'ABILITY',   durationMs: 120 },
-  [EventCategory.ALERT]:     { id: 'ALERT',     durationMs: 200 },
-  [EventCategory.RELOAD]:    { id: 'RELOAD',    durationMs: 160 },
-  [EventCategory.UNKNOWN]:   { id: 'ALERT',     durationMs: 200 },
+  [EventCategory.GUNSHOT]:  { id: 'GUNSHOT',  durationMs: 30 },
+  [EventCategory.FOOTSTEP]: { id: 'FOOTSTEP', durationMs: 60 },
 };
 
 class MotorCommandGenerator {
@@ -48,7 +43,7 @@ class MotorCommandGenerator {
 
     // Step 4 — waveform lookup
     const override = this._waveformOverrides[event.category];
-    const defaults = WAVEFORM_DEFAULTS[event.category] || WAVEFORM_DEFAULTS[EventCategory.UNKNOWN];
+    const defaults = WAVEFORM_DEFAULTS[event.category] || WAVEFORM_DEFAULTS[EventCategory.FOOTSTEP];
     const waveform = override ? override.id : defaults.id;
     const durationMs = override ? override.durationMs : defaults.durationMs;
 

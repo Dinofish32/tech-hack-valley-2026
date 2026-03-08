@@ -2,13 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useDeviceStore } from '../store/useDeviceStore';
 
 const CATEGORY_COLORS = {
-  GUNSHOT:   '#EF4444',
-  FOOTSTEP:  '#F59E0B',
-  EXPLOSION: '#F97316',
-  ABILITY:   '#A855F7',
-  RELOAD:    '#3B82F6',
-  ALERT:     '#EC4899',
-  UNKNOWN:   '#64748B',
+  GUNSHOT:  '#EF4444',
+  FOOTSTEP: '#F59E0B',
 };
 
 const FADE_MS = 300;
@@ -24,7 +19,7 @@ export default function HeadbandVisualizer() {
     const latest = recentCommands[0];
     if (!latest) return;
 
-    const color = CATEGORY_COLORS[latest.waveform] || CATEGORY_COLORS.UNKNOWN;
+    const color = CATEGORY_COLORS[latest.waveform] || CATEGORY_COLORS.FOOTSTEP;
     const { N, E, S, W } = latest.motors;
 
     setMotorState({ N, E, S, W });

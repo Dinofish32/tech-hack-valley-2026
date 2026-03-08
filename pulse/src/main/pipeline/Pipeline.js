@@ -50,7 +50,7 @@ class Pipeline extends EventEmitter {
       useOnnxSeparator: false,
       hfThreshold: 0.20,
       priorityMap: { ...DEFAULT_PRIORITY },
-      enabledCategories: ['GUNSHOT', 'FOOTSTEP', 'EXPLOSION', 'ABILITY', 'RELOAD', 'ALERT', 'UNKNOWN'],
+      enabledCategories: ['GUNSHOT', 'FOOTSTEP'],
       confidenceThreshold: 0.4,
       thresholds: { ...SPECTRAL_THRESHOLDS },
       modelPath: null,

@@ -3,93 +3,105 @@ import { usePipelineStore } from '../store/usePipelineStore';
 
 export default function Settings() {
   const { config, setConfig } = usePipelineStore();
-  const [devices, setDevices] = useState([]);
-  const [transport, setTransport] = useState({ type: 'WEBSOCKET', host: '', port: 8765 });
-  const [bleDevices, setBleDevices] = useState([]);
-  const [scanning, setScanning] = useState(false);
-  const [status, setStatus] = useState('');
+  const [devices, setDevices]         = useState([]);
+  const [serialPorts, setSerialPorts] = useState([]);
+  const [selectedPort, setSelectedPort] = useState('');
+  const [loadingPorts, setLoadingPorts] = useState(false);
+  const [status, setStatus]           = useState('');
+  const [connected, setConnected]     = useState(false);
 
   useEffect(() => {
     if (!window.electronAPI) return;
     window.electronAPI.audio.listDevices().then(setDevices).catch(() => {});
+    refreshSerialPorts();
+    window.electronAPI.transport.onStatus((s) => setConnected(s.connected));
   }, []);
 
-  const connectTransport = async () => {
-    if (!window.electronAPI) return;
-    setStatus('Connecting...');
-    const result = await window.electronAPI.transport.connect({
-      type: transport.type,
-      port: transport.port,
-      host: transport.host,
-    });
-    setStatus(result.ok ? 'Connected!' : `Error: ${result.error}`);
+  const refreshSerialPorts = async () => {
+    if (!window.electronAPI?.serial) return;
+    setLoadingPorts(true);
+    const ports = await window.electronAPI.serial.listPorts().catch(() => []);
+    setSerialPorts(ports);
+    if (ports.length > 0) setSelectedPort((p) => p || ports[0].path);
+    setLoadingPorts(false);
   };
 
-  const disconnectTransport = async () => {
+  const connect = async () => {
+    if (!window.electronAPI || !selectedPort) return;
+    setStatus('Connecting...');
+    const result = await window.electronAPI.transport.connect({ host: selectedPort });
+    setStatus(result.ok ? '' : `Error: ${result.error}`);
+  };
+
+  const disconnect = async () => {
     if (!window.electronAPI) return;
     await window.electronAPI.transport.disconnect();
-    setStatus('Disconnected.');
-  };
-
-  const scanBLE = async () => {
-    if (!window.electronAPI) return;
-    setScanning(true);
-    const found = await window.electronAPI.transport.scan();
-    setBleDevices(found);
-    setScanning(false);
+    setStatus('');
   };
 
   return (
     <div className="p-6 max-w-xl flex flex-col gap-6">
       <h1 className="text-xl font-bold">Settings</h1>
 
-      {/* Transport */}
-      <Section title="Transport">
-        <div className="flex gap-3 mb-3">
-          {['WEBSOCKET', 'BLE'].map((t) => (
-            <button key={t}
-              onClick={() => setTransport({ ...transport, type: t })}
-              className={`px-4 py-2 rounded text-sm ${transport.type === t ? 'bg-accent text-white' : 'bg-muted text-text-muted'}`}>
-              {t === 'WEBSOCKET' ? 'WebSocket' : 'Bluetooth'}
-            </button>
-          ))}
+      {/* Headband connection */}
+      <Section title="Headband">
+        <div className="text-xs text-text-muted bg-muted/50 rounded-lg px-3 py-2 mb-3 leading-relaxed">
+          Plug in the ESP-NOW dongle, then select its COM port and connect.
         </div>
-
-        {transport.type === 'WEBSOCKET' && (
-          <div className="flex gap-2">
-            <input placeholder="Port" type="number" value={transport.port}
-              onChange={(e) => setTransport({ ...transport, port: Number(e.target.value) })}
-              className="bg-muted border border-muted rounded px-3 py-2 text-sm text-text w-28 outline-none focus:border-accent" />
-            <button onClick={connectTransport} className="bg-accent text-white px-4 py-2 rounded text-sm hover:bg-accent/80">Connect</button>
-            <button onClick={disconnectTransport} className="bg-muted text-text-muted px-4 py-2 rounded text-sm hover:bg-muted/70">Disconnect</button>
-          </div>
-        )}
-
-        {transport.type === 'BLE' && (
-          <div>
-            <button onClick={scanBLE} disabled={scanning}
-              className="bg-accent text-white px-4 py-2 rounded text-sm hover:bg-accent/80 disabled:opacity-50 mb-3">
-              {scanning ? 'Scanning...' : 'Scan for devices'}
+        <div className="flex gap-2 mb-3">
+          <select
+            value={selectedPort}
+            onChange={(e) => setSelectedPort(e.target.value)}
+            disabled={connected}
+            className="bg-muted border border-white/10 rounded px-3 py-2 text-sm text-text flex-1 outline-none focus:border-accent disabled:opacity-50"
+          >
+            {serialPorts.length === 0
+              ? <option value="">— No ports found —</option>
+              : serialPorts.map((p) => (
+                  <option key={p.path} value={p.path}>
+                    {p.path}{p.manufacturer ? ` — ${p.manufacturer}` : ''}
+                  </option>
+                ))
+            }
+          </select>
+          <button
+            onClick={refreshSerialPorts}
+            disabled={loadingPorts || connected}
+            className="bg-muted text-text-muted px-3 py-2 rounded text-sm hover:bg-muted/70 disabled:opacity-40"
+          >
+            {loadingPorts ? '...' : 'Refresh'}
+          </button>
+        </div>
+        <div className="flex gap-2">
+          {!connected ? (
+            <button
+              onClick={connect}
+              disabled={!selectedPort}
+              className="bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-500 disabled:opacity-40 flex-1"
+            >
+              Connect
             </button>
-            {bleDevices.map((d) => (
-              <div key={d.id} className="flex items-center gap-3 bg-muted rounded px-3 py-2 mb-2">
-                <span className="text-sm text-text flex-1">{d.name} ({d.id})</span>
-                <span className="text-xs text-text-muted">{d.rssi} dBm</span>
-                <button onClick={() => window.electronAPI?.transport.connect({ type: 'BLE', deviceId: d.id })}
-                  className="text-xs text-accent hover:underline">Connect</button>
-              </div>
-            ))}
-          </div>
+          ) : (
+            <button
+              onClick={disconnect}
+              className="bg-danger/20 text-danger px-4 py-2 rounded text-sm hover:bg-danger/30 flex-1"
+            >
+              Disconnect
+            </button>
+          )}
+        </div>
+        {status && (
+          <div className="text-xs mt-2 text-danger">{status}</div>
         )}
-
-        {status && <div className="text-xs text-text-muted mt-2">{status}</div>}
       </Section>
 
       {/* Audio device */}
       <Section title="Audio Device">
-        <select className="bg-muted border border-muted rounded px-3 py-2 text-sm text-text outline-none focus:border-accent w-full"
+        <select
+          className="bg-muted border border-white/10 rounded px-3 py-2 text-sm text-text outline-none focus:border-accent w-full"
           value={config.deviceIndex ?? ''}
-          onChange={(e) => setConfig({ deviceIndex: e.target.value ? Number(e.target.value) : null })}>
+          onChange={(e) => setConfig({ deviceIndex: e.target.value ? Number(e.target.value) : null })}
+        >
           <option value="">Default loopback device</option>
           {devices.map((d) => (
             <option key={d.index} value={d.index}>{d.name}</option>

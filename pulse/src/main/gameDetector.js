@@ -43,6 +43,7 @@ class GameDetector extends EventEmitter {
           if (this._lastDetected !== key) {
             this._lastDetected = key;
             this.emit('game:detected', {
+              gameName: game.name,
               processName: game.process,
               profileId: null,
               pid: match.pid || null,
@@ -63,6 +64,7 @@ class GameDetector extends EventEmitter {
           if (this._lastDetected !== key) {
             this._lastDetected = key;
             this.emit('game:detected', {
+              gameName: profile.name,
               processName: profile.process,
               profileId: profile.id,
               pid: match.pid || null,

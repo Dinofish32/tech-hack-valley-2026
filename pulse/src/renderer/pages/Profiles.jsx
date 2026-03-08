@@ -7,12 +7,12 @@ const EMPTY_PROFILE = {
   name: '',
   process: '',
   hfThreshold: 0.65,
-  priorityMap: { GUNSHOT: 1, EXPLOSION: 1, FOOTSTEP: 2, ABILITY: 2, RELOAD: 4, ALERT: 3, UNKNOWN: 4 },
-  enabledCats: ['GUNSHOT', 'FOOTSTEP', 'EXPLOSION', 'ABILITY', 'RELOAD', 'ALERT'],
+  priorityMap: { GUNSHOT: 1, FOOTSTEP: 2 },
+  enabledCats: ['GUNSHOT', 'FOOTSTEP'],
   patterns: {},
 };
 
-const ALL_CATEGORIES = ['GUNSHOT', 'FOOTSTEP', 'EXPLOSION', 'ABILITY', 'RELOAD', 'ALERT', 'UNKNOWN'];
+const ALL_CATEGORIES = ['GUNSHOT', 'FOOTSTEP'];
 
 export default function Profiles() {
   const { profiles, communityProfiles, loadProfiles, saveProfile, deleteProfile } = useProfileStore();

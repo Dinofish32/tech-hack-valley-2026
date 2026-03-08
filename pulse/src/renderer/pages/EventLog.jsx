@@ -3,7 +3,7 @@ import { useEventLogStore } from '../store/useEventLogStore';
 import EventCard from '../components/EventCard';
 
 const DIRECTIONS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-const CATEGORIES = ['GUNSHOT', 'FOOTSTEP', 'EXPLOSION', 'ABILITY', 'RELOAD', 'ALERT', 'UNKNOWN'];
+const CATEGORIES = ['GUNSHOT', 'FOOTSTEP'];
 
 export default function EventLog() {
   const { events, paused, filters, setPaused, setFilters, clearEvents, getFilteredEvents } = useEventLogStore();

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 const MOTORS = ['N', 'E', 'S', 'W'];
 const MOTOR_LABELS = { N: 'North', E: 'East', S: 'South', W: 'West' };
 
-const WAVEFORMS = ['GUNSHOT', 'FOOTSTEP', 'EXPLOSION', 'ABILITY', 'ALERT', 'RELOAD'];
+const WAVEFORMS = ['GUNSHOT', 'FOOTSTEP'];
 
 export default function Calibration() {
   const [step, setStep] = useState(1);

@@ -49,16 +49,6 @@ class SpectralClassifier {
       footSubBassMin:  0.28, // sub-bass fraction must exceed this
       footHighMax:     0.22, // high-frequency fraction must be below this
 
-      // ── Explosion: gunshot + low rumble ───────────────────────────
-      explCentroidMin: 350,
-      explCentroidMax: 2200,
-      explFlatness:    0.22,
-      explSubBassMin:  0.08,
-
-      // ── Ability: tonal mid-range burst ────────────────────────────
-      abilCentroidMin: 600,
-      abilCentroidMax: 3500,
-
       ...thresholds,
     };
   }
@@ -70,7 +60,7 @@ class SpectralClassifier {
    */
   classify({ powerL, powerR }) {
     if (!powerL || powerL.length === 0) {
-      return { category: EventCategory.UNKNOWN, confidence: 0 };
+      return { category: EventCategory.FOOTSTEP, confidence: 0 };
     }
     const spectrum  = this._avgSpectrum(powerL, powerR);
     const features  = this._extractFeatures(spectrum);
@@ -165,41 +155,9 @@ class SpectralClassifier {
     if (highRatio < t.footHighMax)         foot += 0.15;
     if (flatness < 0.50)                   foot += 0.10; // footsteps aren't pure noise
 
-    // ── EXPLOSION ─────────────────────────────────────────────────────
-    // Raze ult, spike: like a gunshot but shifted lower with more rumble.
-    let expl = 0;
-    if (centroid > t.explCentroidMin && centroid < t.explCentroidMax) expl += 0.40;
-    if (flatness > t.explFlatness)     expl += 0.30;
-    if (subBassRatio > t.explSubBassMin && subBassRatio < 0.35)       expl += 0.20;
-    if (lowMidRatio > 0.25)            expl += 0.10;
-    // Penalise: if it more clearly matches gun or foot, it's not an explosion
-    if (centroid > t.gunCentroidHz && subBassRatio < t.gunSubBassMax) expl *= 0.50;
-    if (centroid < t.footCentroidHz)                                   expl *= 0.40;
-
-    // ── ABILITY ───────────────────────────────────────────────────────
-    // Sova dart, Brim smoke, etc: tonal mid-range bursts.
-    // Wins by exclusion — only if it doesn't clearly match gun or foot.
-    let abil = 0;
-    if (centroid > t.abilCentroidMin && centroid < t.abilCentroidMax) abil += 0.30;
-    if (flatness < 0.30)   abil += 0.20; // more tonal than gunshot
-    if (lowMidRatio > 0.40) abil += 0.20;
-    // Suppressed by strong gun or foot evidence
-    abil *= (1 - Math.max(gun, foot) * 0.8);
-
-    // ── Winner ────────────────────────────────────────────────────────
-    const scores = {
-      [EventCategory.GUNSHOT]:   gun,
-      [EventCategory.FOOTSTEP]:  foot,
-      [EventCategory.EXPLOSION]: expl,
-      [EventCategory.ABILITY]:   abil,
-    };
-
-    let best      = EventCategory.UNKNOWN;
-    let bestScore = this.confidenceThreshold; // must beat threshold to win
-
-    for (const [cat, s] of Object.entries(scores)) {
-      if (s > bestScore) { bestScore = s; best = cat; }
-    }
+    // ── Winner: always return whichever of gun/foot scored higher ─────
+    const best      = gun >= foot ? EventCategory.GUNSHOT : EventCategory.FOOTSTEP;
+    const bestScore = gun >= foot ? gun : foot;
 
     return { category: best, confidence: +bestScore.toFixed(3) };
   }

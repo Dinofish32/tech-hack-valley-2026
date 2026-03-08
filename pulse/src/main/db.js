@@ -69,20 +69,24 @@ function init() {
     );
 
     CREATE TABLE IF NOT EXISTS events (
-      id          TEXT PRIMARY KEY,
-      sessionId   TEXT NOT NULL,
-      timestamp   INTEGER NOT NULL,
-      category    TEXT NOT NULL,
-      direction   TEXT NOT NULL,
-      confidence  REAL NOT NULL,
-      priority    INTEGER NOT NULL,
-      transmitted INTEGER NOT NULL,
-      latencyMs   REAL NOT NULL
+      id           TEXT PRIMARY KEY,
+      sessionId    TEXT NOT NULL,
+      timestamp    INTEGER NOT NULL,
+      category     TEXT NOT NULL,
+      direction    TEXT NOT NULL,
+      confidence   REAL NOT NULL,
+      priority     INTEGER NOT NULL,
+      transmitted  INTEGER NOT NULL,
+      latencyMs    REAL NOT NULL,
+      intensityRms REAL DEFAULT 0,
+      syncedAt     INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS sessions (
       id               TEXT PRIMARY KEY,
       profileId        TEXT NOT NULL,
+      gameName         TEXT DEFAULT '',
+      processName      TEXT DEFAULT '',
       startedAt        INTEGER NOT NULL,
       endedAt          INTEGER,
       totalEvents      INTEGER DEFAULT 0,
@@ -94,6 +98,17 @@ function init() {
       value TEXT NOT NULL
     );
   `);
+    // Migrations for existing DBs (ALTER TABLE ignores if column already exists via try-catch)
+    const migrations = [
+      "ALTER TABLE events ADD COLUMN intensityRms REAL DEFAULT 0",
+      "ALTER TABLE events ADD COLUMN syncedAt INTEGER",
+      "ALTER TABLE sessions ADD COLUMN gameName TEXT DEFAULT ''",
+      "ALTER TABLE sessions ADD COLUMN processName TEXT DEFAULT ''",
+    ];
+    for (const sql of migrations) {
+      try { db.exec(sql); } catch {}
+    }
+
     return db;
   } catch (e) {
     console.warn('[db] SQLite unavailable, using in-memory stub:', e.message);
@@ -140,11 +155,35 @@ function deleteProfile(id) {
 function insertEvent(event) {
   try {
     getDb().prepare(`
-      INSERT INTO events (id, sessionId, timestamp, category, direction, confidence, priority, transmitted, latencyMs)
-      VALUES (@id, @sessionId, @timestamp, @category, @direction, @confidence, @priority, @transmitted, @latencyMs)
-    `).run(event);
+      INSERT INTO events (id, sessionId, timestamp, category, direction, confidence, priority, transmitted, latencyMs, intensityRms, syncedAt)
+      VALUES (@id, @sessionId, @timestamp, @category, @direction, @confidence, @priority, @transmitted, @latencyMs, @intensityRms, @syncedAt)
+    `).run({
+      intensityRms: 0,
+      syncedAt: null,
+      ...event,
+    });
   } catch (err) {
     console.error('[db] insertEvent error:', err.message);
+  }
+}
+
+function getUnsyncedEvents(limit = 1000) {
+  try {
+    return getDb().prepare('SELECT * FROM events WHERE syncedAt IS NULL ORDER BY timestamp ASC LIMIT ?').all(limit);
+  } catch (err) {
+    console.error('[db] getUnsyncedEvents error:', err.message);
+    return [];
+  }
+}
+
+function markEventsSynced(ids) {
+  if (!ids || ids.length === 0) return;
+  try {
+    const now = Date.now();
+    const placeholders = ids.map(() => '?').join(',');
+    getDb().prepare(`UPDATE events SET syncedAt=? WHERE id IN (${placeholders})`).run(now, ...ids);
+  } catch (err) {
+    console.error('[db] markEventsSynced error:', err.message);
   }
 }
 
@@ -168,8 +207,9 @@ function queryEvents({ sessionId, filters = {} }) {
 function startSession(session) {
   try {
     getDb().prepare(`
-      INSERT INTO sessions (id, profileId, startedAt) VALUES (@id, @profileId, @startedAt)
-    `).run(session);
+      INSERT INTO sessions (id, profileId, gameName, processName, startedAt)
+      VALUES (@id, @profileId, @gameName, @processName, @startedAt)
+    `).run({ gameName: '', processName: '', ...session });
   } catch (err) {
     console.error('[db] startSession error:', err.message);
   }
@@ -225,7 +265,7 @@ function clearEvents() {
 module.exports = {
   init, getDb,
   listProfiles, saveProfile, deleteProfile,
-  insertEvent, queryEvents,
+  insertEvent, queryEvents, getUnsyncedEvents, markEventsSynced,
   startSession, endSession, incrementSessionEvents,
   getSetting, setSetting, clearEvents,
 };

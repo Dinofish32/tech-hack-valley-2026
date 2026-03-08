@@ -1,13 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 const CATEGORY_COLORS = {
-  GUNSHOT:   '#EF4444',
-  FOOTSTEP:  '#F59E0B',
-  EXPLOSION: '#F97316',
-  ABILITY:   '#A855F7',
-  RELOAD:    '#3B82F6',
-  ALERT:     '#EC4899',
-  UNKNOWN:   '#6366F1',
+  GUNSHOT:  '#EF4444',
+  FOOTSTEP: '#F59E0B',
 };
 
 const FADE_MS = 400;

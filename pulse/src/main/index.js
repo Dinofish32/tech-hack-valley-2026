@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { init: initDb } = require('./db');
-const { registerIpcHandlers, setActiveGamePid, setOverlayWindow, setMotorWindow } = require('./ipc');
+const { registerIpcHandlers, setActiveGamePid, setActiveGameInfo, setOverlayWindow, setMotorWindow } = require('./ipc');
 const GameDetector = require('./gameDetector');
 
 // Handle Squirrel startup events on Windows
@@ -168,11 +168,12 @@ app.whenReady().then(async () => {
 
     // Start game detector
     gameDetector = new GameDetector({ pollIntervalMs: 3000 });
-    gameDetector.on('game:detected', ({ processName, profileId, pid }) => {
+    gameDetector.on('game:detected', ({ gameName, processName, profileId, pid }) => {
       activeGamePid = pid || null;
       setActiveGamePid(activeGamePid);
+      setActiveGameInfo({ gameName: gameName || '', processName: processName || '' });
       createOverlays();
-      if (mainWindow) mainWindow.webContents.send('game:detected', { processName, profileId, pid });
+      if (mainWindow) mainWindow.webContents.send('game:detected', { gameName, processName, profileId, pid });
     });
     gameDetector.on('game:lost', () => {
       activeGamePid = null;

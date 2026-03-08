@@ -1,33 +1,31 @@
-#include <WebSocketsClient.h>
+// ─────────────────────────────────────────────────────────────────────────────
+// Puls8 — Headband Firmware (ESP-NOW receiver)
+//
+// On first boot, open Serial Monitor and copy the MAC address printed.
+// Paste it into HEADBAND_MAC in dongle.ino, then flash the dongle.
+// ─────────────────────────────────────────────────────────────────────────────
+#include <esp_now.h>
 #include <WiFi.h>
 
-// ── User config — set before flashing ─────────────────────────────────────
-const char* SSID     = "YOUR_WIFI";
-const char* PASSWORD = "YOUR_PASS";
-const char* PC_IP    = "192.168.1.x";
-const int   WS_PORT  = 8765;
+// ── Motor GPIO pins — adjust to your wiring ───────────────────────────────
+const int PIN_N = 5;
+const int PIN_E = 18;
+const int PIN_S = 19;
+const int PIN_W = 21;
 
-// ── Motor / LED GPIO pins ──────────────────────────────────────────────────
-// Adjust to actual GPIO numbers on your board
-const int PIN_N = 5;   // North motor
-const int PIN_E = 18;  // East motor
-const int PIN_S = 19;  // South motor
-const int PIN_W = 21;  // West motor
-
-// ── PWM config (ESP32 LEDC) ────────────────────────────────────────────────
+// ── PWM (ESP32 LEDC) ─────────────────────────────────────────────────────
 const int PWM_FREQ       = 5000;
-const int PWM_RESOLUTION = 8;    // 8-bit: 0-255
+const int PWM_RESOLUTION = 8;   // 8-bit: 0–255
 const int CH_N = 0, CH_E = 1, CH_S = 2, CH_W = 3;
 
-// ── Failsafe ───────────────────────────────────────────────────────────────
-const unsigned long FAILSAFE_MS = 300;  // all off if no packet for 300ms
+// ── Failsafe: motors off if no packet received for this long ─────────────
+const unsigned long FAILSAFE_MS = 500;
+
+// ── State ─────────────────────────────────────────────────────────────────
 unsigned long lastPacketMs = 0;
+unsigned long motorOffAt   = 0;
 
-// ── Motor command state ────────────────────────────────────────────────────
-unsigned long motorOffAt = 0;  // millis() when motors should turn off
-
-WebSocketsClient wsClient;
-
+// ── Helpers ───────────────────────────────────────────────────────────────
 void allOff() {
   ledcWrite(CH_N, 0);
   ledcWrite(CH_E, 0);
@@ -35,101 +33,87 @@ void allOff() {
   ledcWrite(CH_W, 0);
 }
 
-void handlePacket(uint8_t* payload, size_t length) {
-  if (length != 8) return;
+void handlePacket(const uint8_t* data, int len) {
+  if (len != 8) return;
 
-  // Verify XOR checksum (bytes 0-6 XOR == byte 7)
+  // Verify XOR checksum (bytes 0–6 XOR == byte 7)
   uint8_t xorVal = 0;
-  for (int i = 0; i < 7; i++) xorVal ^= payload[i];
-  if (xorVal != payload[7]) return;  // drop invalid packet
+  for (int i = 0; i < 7; i++) xorVal ^= data[i];
+  if (xorVal != data[7]) {
+    Serial.println("[Headband] Bad checksum, dropping packet");
+    return;
+  }
 
-  uint8_t intensityN  = payload[0];
-  uint8_t intensityE  = payload[1];
-  uint8_t intensityS  = payload[2];
-  uint8_t intensityW  = payload[3];
-  uint8_t waveformId  = payload[4];
-  uint16_t durationMs = ((uint16_t)payload[5] << 8) | payload[6];
+  uint8_t  waveformId = data[4];
+  uint16_t durationMs = ((uint16_t)data[5] << 8) | data[6];
 
-  // STOP command
+  // 0xFF = STOP command
   if (waveformId == 0xFF) {
     allOff();
     motorOffAt = 0;
     return;
   }
 
-  // Drive motors
-  ledcWrite(CH_N, intensityN);
-  ledcWrite(CH_E, intensityE);
-  ledcWrite(CH_S, intensityS);
-  ledcWrite(CH_W, intensityW);
+  ledcWrite(CH_N, data[0]);
+  ledcWrite(CH_E, data[1]);
+  ledcWrite(CH_S, data[2]);
+  ledcWrite(CH_W, data[3]);
 
-  motorOffAt = millis() + durationMs;
+  motorOffAt   = millis() + durationMs;
   lastPacketMs = millis();
 }
 
-void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
-  switch (type) {
-    case WStype_CONNECTED:
-      Serial.println("[WS] Connected to PC");
-      lastPacketMs = millis();
-      break;
-    case WStype_DISCONNECTED:
-      Serial.println("[WS] Disconnected");
-      allOff();
-      break;
-    case WStype_BIN:
-      handlePacket(payload, length);
-      break;
-    default:
-      break;
-  }
+// ── ESP-NOW receive callback ──────────────────────────────────────────────
+// Note: if you get a compile error here, your ESP32 Arduino core is >= 3.0
+// Replace the signature with:
+//   void onReceive(const esp_now_recv_info_t *info, const uint8_t *data, int len)
+void onReceive(const uint8_t* mac, const uint8_t* data, int len) {
+  handlePacket(data, len);
 }
 
+// ── Setup ─────────────────────────────────────────────────────────────────
 void setup() {
   Serial.begin(115200);
 
-  // Configure PWM channels
-  ledcSetup(CH_N, PWM_FREQ, PWM_RESOLUTION);
-  ledcSetup(CH_E, PWM_FREQ, PWM_RESOLUTION);
-  ledcSetup(CH_S, PWM_FREQ, PWM_RESOLUTION);
-  ledcSetup(CH_W, PWM_FREQ, PWM_RESOLUTION);
-  ledcAttachPin(PIN_N, CH_N);
-  ledcAttachPin(PIN_E, CH_E);
-  ledcAttachPin(PIN_S, CH_S);
-  ledcAttachPin(PIN_W, CH_W);
+  // PWM setup
+  ledcSetup(CH_N, PWM_FREQ, PWM_RESOLUTION); ledcAttachPin(PIN_N, CH_N);
+  ledcSetup(CH_E, PWM_FREQ, PWM_RESOLUTION); ledcAttachPin(PIN_E, CH_E);
+  ledcSetup(CH_S, PWM_FREQ, PWM_RESOLUTION); ledcAttachPin(PIN_S, CH_S);
+  ledcSetup(CH_W, PWM_FREQ, PWM_RESOLUTION); ledcAttachPin(PIN_W, CH_W);
   allOff();
 
-  // Connect to Wi-Fi
-  WiFi.begin(SSID, PASSWORD);
-  Serial.print("[WiFi] Connecting");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\n[WiFi] Connected: " + WiFi.localIP().toString());
+  // ESP-NOW — STA mode, no AP connection needed
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
 
-  // Connect to PC WebSocket server
-  wsClient.begin(PC_IP, WS_PORT, "/");
-  wsClient.onEvent(webSocketEvent);
-  wsClient.setReconnectInterval(3000);
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("[Headband] ESP-NOW init failed");
+    return;
+  }
+
+  esp_now_register_recv_cb(onReceive);
+
+  // Print MAC so you can paste it into dongle.ino
+  Serial.print("[Headband] MAC: ");
+  Serial.println(WiFi.macAddress());
+  Serial.println("[Headband] Waiting for packets...");
 
   lastPacketMs = millis();
 }
 
+// ── Loop ─────────────────────────────────────────────────────────────────
 void loop() {
-  wsClient.loop();
-
   unsigned long now = millis();
 
-  // Turn off motors after duration expires
+  // Turn motors off when their duration expires
   if (motorOffAt > 0 && now >= motorOffAt) {
     allOff();
     motorOffAt = 0;
   }
 
-  // Failsafe: all off if no packet for FAILSAFE_MS
+  // Failsafe: if the PC stops sending for too long, kill motors
   if ((now - lastPacketMs) > FAILSAFE_MS) {
     allOff();
-    lastPacketMs = now;  // reset to avoid repeated calls
+    lastPacketMs = now;
   }
 }

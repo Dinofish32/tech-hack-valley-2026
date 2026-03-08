@@ -17,11 +17,6 @@ class Classifier {
     this._categories = [
       EventCategory.GUNSHOT,
       EventCategory.FOOTSTEP,
-      EventCategory.EXPLOSION,
-      EventCategory.ABILITY,
-      EventCategory.RELOAD,
-      EventCategory.ALERT,
-      EventCategory.UNKNOWN,
     ];
   }
 
@@ -30,7 +25,7 @@ class Classifier {
    */
   async init() {
     if (!this.modelPath || !fs.existsSync(this.modelPath)) {
-      console.warn('[Classifier] Model file not found at', this.modelPath, '— running in degraded mode (always UNKNOWN)');
+      console.warn('[Classifier] Model file not found at', this.modelPath, '— running spectral fallback');
       return;
     }
     try {
@@ -70,13 +65,11 @@ class Classifier {
         }
       }
 
-      // Run inference synchronously via async wrapper
-      // (called from sync context — use a cached result approach)
       // Note: onnxruntime-node requires async — caller should use classifyAsync
-      return { category: EventCategory.UNKNOWN, confidence: 0 };
+      return this._spectral.classify(stftResult);
     } catch (err) {
       console.warn('[Classifier] inference error:', err.message);
-      return { category: EventCategory.UNKNOWN, confidence: 0 };
+      return this._spectral.classify(stftResult);
     }
   }
 
@@ -110,7 +103,7 @@ class Classifier {
       const probs = results[outputKey].data;
 
       let maxProb = 0;
-      let maxIdx = 6; // default UNKNOWN
+      let maxIdx = 1; // default FOOTSTEP
       for (let i = 0; i < probs.length && i < this._categories.length; i++) {
         if (probs[i] > maxProb) {
           maxProb = probs[i];
@@ -119,13 +112,13 @@ class Classifier {
       }
 
       if (maxProb < this.confidenceThreshold) {
-        return { category: EventCategory.UNKNOWN, confidence: maxProb };
+        return this._spectral.classify(stftResult);
       }
 
       return { category: this._categories[maxIdx], confidence: maxProb };
     } catch (err) {
       console.warn('[Classifier] async inference error:', err.message);
-      return { category: EventCategory.UNKNOWN, confidence: 0 };
+      return this._spectral.classify(stftResult);
     }
   }
 }

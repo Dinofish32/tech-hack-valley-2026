@@ -1,25 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 const COLORS = {
-  GUNSHOT:   '#EF4444',
-  FOOTSTEP:  '#F59E0B',
-  EXPLOSION: '#F97316',
-  ABILITY:   '#A855F7',
-  RELOAD:    '#3B82F6',
-  ALERT:     '#EC4899',
-  UNKNOWN:   '#6366F1',
+  GUNSHOT:  '#EF4444',
+  FOOTSTEP: '#F59E0B',
 };
 
-// How long the overlay stays lit per category — scaled up from haptic durationMs
-// to give the user enough time to register the visual feedback
 const DISPLAY_MS = {
-  GUNSHOT:   2000,
-  EXPLOSION: 2500,
-  FOOTSTEP:  1500,
-  ABILITY:   1500,
-  ALERT:     1200,
-  RELOAD:    1000,
-  UNKNOWN:    800,
+  GUNSHOT:  2000,
+  FOOTSTEP: 1500,
 };
 
 const DIAGONALS = new Set(['NE', 'NW', 'SE', 'SW']);
@@ -59,8 +47,8 @@ export default function Overlay() {
 
     // Only light up when a command is actually dispatched to the MCU
     api.pipeline.onCommand((cmd) => {
-      const cat   = cmd.waveform || 'UNKNOWN';
-      const color = COLORS[cat] || COLORS.UNKNOWN;
+      const cat   = cmd.waveform || 'FOOTSTEP';
+      const color = COLORS[cat] || COLORS.FOOTSTEP;
       const dir   = peakDirection(cmd.motors);
       setEvt({ category: cat, direction: dir, color });
       setVisible(true);

@@ -1,13 +1,8 @@
 import React from 'react';
 
 const CATEGORY_ICONS = {
-  GUNSHOT:   '💥',
-  FOOTSTEP:  '👣',
-  EXPLOSION: '💣',
-  ABILITY:   '✨',
-  RELOAD:    '🔄',
-  ALERT:     '⚠️',
-  UNKNOWN:   '?',
+  GUNSHOT:  '💥',
+  FOOTSTEP: '👣',
 };
 
 const DIR_ARROWS = {

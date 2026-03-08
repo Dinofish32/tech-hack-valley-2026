@@ -1,17 +1,19 @@
 const path = require('path');
 const fs = require('fs');
 const Pipeline = require('../main/pipeline/Pipeline');
-const WebSocketTransport = require('../transport/WebSocketTransport');
-const BLETransport = require('../transport/BLETransport');
+const SerialTransport = require('../transport/SerialTransport');
 const AudioCapture = require('../main/pipeline/AudioCapture');
 const db = require('./db');
 
-let pipeline      = null;
-let transport     = null;
-let getWindow     = null;
-let activeGamePid = null;
-let overlayWindow = null;
-let motorWindow   = null;
+let pipeline            = null;
+let transport           = null;
+let getWindow           = null;
+let activeGamePid       = null;
+let activeGameName      = '';
+let activeProcessName   = '';
+let currentSessionId    = null;
+let overlayWindow       = null;
+let motorWindow         = null;
 
 function setOverlayWindow(win) { overlayWindow = win; }
 function setMotorWindow(win)   { motorWindow = win; }
@@ -19,6 +21,11 @@ function setMotorWindow(win)   { motorWindow = win; }
 /** Called by index.js when GameDetector fires game:detected / game:lost */
 function setActiveGamePid(pid) {
   activeGamePid = pid || null;
+}
+
+function setActiveGameInfo({ gameName = '', processName = '' } = {}) {
+  activeGameName = gameName;
+  activeProcessName = processName;
 }
 
 function send(channel, data) {
@@ -43,7 +50,22 @@ function registerIpcHandlers(ipcMain, windowGetter) {
       if (pipeline) {
         await pipeline.stop();
         pipeline = null;
+        if (currentSessionId) {
+          db.endSession(currentSessionId);
+          currentSessionId = null;
+        }
       }
+
+      const { v4: uuidv4 } = require('uuid');
+      currentSessionId = uuidv4();
+      db.startSession({
+        id: currentSessionId,
+        profileId: config?.profileId || 'default',
+        gameName: activeGameName,
+        processName: activeProcessName,
+        startedAt: Date.now(),
+      });
+
       pipeline = new Pipeline({ ...(config || {}), gamePid: activeGamePid });
 
       pipeline.on('command', (command) => {
@@ -64,14 +86,16 @@ function registerIpcHandlers(ipcMain, windowGetter) {
 
       pipeline.on('event', (event) => {
         send('pipeline:event', event);
-        // Persist to DB asynchronously
         try {
           db.insertEvent({
             ...event,
-            sessionId: 'current',
+            sessionId: currentSessionId || 'default',
             transmitted: 1,
-            latencyMs: 0,
+            latencyMs: Date.now() - event.timestamp,
+            intensityRms: event.intensityRms ?? 0,
+            syncedAt: null,
           });
+          db.incrementSessionEvents(currentSessionId || 'default');
         } catch (e) {}
       });
 
@@ -102,6 +126,10 @@ function registerIpcHandlers(ipcMain, windowGetter) {
         await pipeline.stop();
         pipeline = null;
       }
+      if (currentSessionId) {
+        db.endSession(currentSessionId);
+        currentSessionId = null;
+      }
       return { ok: true };
     } catch (err) {
       return { ok: false, error: err.message };
@@ -124,27 +152,17 @@ function registerIpcHandlers(ipcMain, windowGetter) {
 
   // ── Transport ────────────────────────────────────────────────────────────
 
-  ipcMain.handle('transport:connect', async (_event, { type, host, port, deviceId }) => {
+  ipcMain.handle('transport:connect', async (_event, { host, port }) => {
     try {
       if (transport) {
         await transport.stop?.();
-        await transport.disconnect?.();
         transport = null;
       }
-
-      if (type === 'WEBSOCKET') {
-        transport = new WebSocketTransport({ port: port || 8765 });
-        transport.on('connect', (addr) => send('transport:status', { connected: true, type: 'WEBSOCKET', address: addr, latencyMs: 0 }));
-        transport.on('disconnect', () => send('transport:status', { connected: false, type: 'NONE', latencyMs: 0 }));
-        transport.on('error', (e) => console.warn('[transport] ws error:', e.message));
-        await transport.start();
-      } else if (type === 'BLE') {
-        transport = new BLETransport();
-        transport.on('connect', () => send('transport:status', { connected: true, type: 'BLE', latencyMs: 0 }));
-        transport.on('disconnect', () => send('transport:status', { connected: false, type: 'NONE', latencyMs: 0 }));
-        if (deviceId) await transport.connect(deviceId);
-      }
-
+      transport = new SerialTransport({ path: host, baudRate: port || 115200 });
+      transport.on('connect', (addr) => send('transport:status', { connected: true, type: 'SERIAL', address: addr, latencyMs: 0 }));
+      transport.on('disconnect', () => send('transport:status', { connected: false, type: 'NONE', latencyMs: 0 }));
+      transport.on('error', (e) => console.warn('[transport] serial error:', e.message));
+      await transport.start();
       return { ok: true };
     } catch (err) {
       console.error('[ipc] transport:connect error:', err.message);
@@ -166,13 +184,11 @@ function registerIpcHandlers(ipcMain, windowGetter) {
     }
   });
 
-  ipcMain.handle('transport:scan', async () => {
+  ipcMain.handle('serial:listPorts', async () => {
     try {
-      const ble = new BLETransport();
-      const devices = await ble.scan(5000);
-      return devices;
+      return await SerialTransport.listPorts();
     } catch (err) {
-      console.warn('[ipc] transport:scan error:', err.message);
+      console.warn('[ipc] serial:listPorts error:', err.message);
       return [];
     }
   });
@@ -281,4 +297,4 @@ function registerIpcHandlers(ipcMain, windowGetter) {
   });
 }
 
-module.exports = { registerIpcHandlers, setActiveGamePid, setOverlayWindow, setMotorWindow };
+module.exports = { registerIpcHandlers, setActiveGamePid, setActiveGameInfo, setOverlayWindow, setMotorWindow };

@@ -60,6 +60,7 @@
   "optionalDependencies": {
     "@abandonware/noble": "^1.9.2-26",
     "better-sqlite3": "^9.6.0",
-    "node-portaudio": "^0.4.10"
+    "node-portaudio": "^0.4.10",
+    "serialport": "^12.0.0"
   }
 }

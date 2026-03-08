@@ -15,7 +15,7 @@ export const usePipelineStore = create((set) => ({
     useOnnxSeparator: false,
     hfThreshold: 0.20,
     confidenceThreshold: 0.4,
-    enabledCategories: ['GUNSHOT', 'FOOTSTEP', 'EXPLOSION', 'ABILITY', 'RELOAD', 'ALERT', 'UNKNOWN'],
+    enabledCategories: ['GUNSHOT', 'FOOTSTEP'],
   },
   detectedGame: null,
 

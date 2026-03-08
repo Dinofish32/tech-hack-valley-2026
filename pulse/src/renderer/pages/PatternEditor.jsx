@@ -2,12 +2,8 @@ import React, { useState } from 'react';
 import WaveformCanvas from '../components/WaveformCanvas';
 
 const DEFAULT_PATTERNS = {
-  GUNSHOT:   [{ durationMs: 30, intensity: 100 }],
-  FOOTSTEP:  [{ durationMs: 20, intensity: 60 }, { durationMs: 10, intensity: 0 }, { durationMs: 20, intensity: 60 }],
-  EXPLOSION: [{ durationMs: 50, intensity: 40 }, { durationMs: 200, intensity: 100 }, { durationMs: 150, intensity: 20 }],
-  ABILITY:   [{ durationMs: 30, intensity: 80 }, { durationMs: 10, intensity: 0 }, { durationMs: 30, intensity: 80 }, { durationMs: 10, intensity: 0 }, { durationMs: 30, intensity: 80 }],
-  ALERT:     [{ durationMs: 200, intensity: 70 }],
-  RELOAD:    [{ durationMs: 80, intensity: 50 }, { durationMs: 40, intensity: 0 }, { durationMs: 80, intensity: 50 }],
+  GUNSHOT:  [{ durationMs: 30, intensity: 100 }],
+  FOOTSTEP: [{ durationMs: 20, intensity: 60 }, { durationMs: 10, intensity: 0 }, { durationMs: 20, intensity: 60 }],
 };
 
 const CATEGORIES = Object.keys(DEFAULT_PATTERNS);

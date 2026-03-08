@@ -15,7 +15,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   transport: {
     connect: (opts) => ipcRenderer.invoke('transport:connect', opts),
     disconnect: () => ipcRenderer.invoke('transport:disconnect'),
-    scan: () => ipcRenderer.invoke('transport:scan'),
     onStatus: (cb) => ipcRenderer.on('transport:status', (_e, d) => cb(d)),
   },
   profiles: {
@@ -35,6 +34,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   game: {
     onDetected: (cb) => ipcRenderer.on('game:detected', (_e, d) => cb(d)),
+  },
+  serial: {
+    listPorts: () => ipcRenderer.invoke('serial:listPorts'),
   },
   overlay: {
     setPosition: (positions) => ipcRenderer.invoke('overlay:setPosition', positions),
