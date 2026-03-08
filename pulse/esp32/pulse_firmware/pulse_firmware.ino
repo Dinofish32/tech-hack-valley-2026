@@ -11,18 +11,22 @@
 #include <WiFi.h>
 
 // ── Motor GPIO pins [footstep, gunshot] ───────────────────────────────────
-const int PIN_N[2] = { 12, 13 };
+const int PIN_N[2] = {  6,  7 };
 const int PIN_S[2] = { 18, 19 };
 const int PIN_E[2] = {  2,  3 };
 const int PIN_W[2] = {  4,  5 };
 
 // Flat array for iteration: N_foot, N_gun, S_foot, S_gun, E_foot, E_gun, W_foot, W_gun
-const int ALL_PINS[8] = { 12, 13, 18, 19, 2, 3, 4, 5 };
+const int ALL_PINS[8] = {  6,  7, 18, 19, 2, 3, 4, 5 };
 
-// ── waveformId values (must match constants.js) ───────────────────────────
-const uint8_t WF_GUNSHOT  = 1;
-const uint8_t WF_FOOTSTEP = 2;
-const uint8_t WF_STOP     = 0xFF;
+// ── waveformId values (must match packetSchema.js WAVEFORM_IDS) ───────────
+const uint8_t WF_GUNSHOT   = 0x00;
+const uint8_t WF_FOOTSTEP  = 0x01;
+const uint8_t WF_EXPLOSION = 0x02;
+const uint8_t WF_ABILITY   = 0x03;
+const uint8_t WF_ALERT     = 0x04;
+const uint8_t WF_RELOAD    = 0x05;
+const uint8_t WF_STOP      = 0xFF;
 
 // ── PWM (ESP32 LEDC, core 3.x API) ───────────────────────────────────────
 const int PWM_FREQ       = 5000;
@@ -42,6 +46,19 @@ void allOff() {
   for (int i = 0; i < 8; i++) ledcWrite(ALL_PINS[i], 0);
 }
 
+const char* waveformName(uint8_t id) {
+  switch (id) {
+    case WF_GUNSHOT:   return "GUNSHOT";
+    case WF_FOOTSTEP:  return "FOOTSTEP";
+    case WF_EXPLOSION: return "EXPLOSION";
+    case WF_ABILITY:   return "ABILITY";
+    case WF_ALERT:     return "ALERT";
+    case WF_RELOAD:    return "RELOAD";
+    case WF_STOP:      return "STOP";
+    default:           return "UNKNOWN";
+  }
+}
+
 void handlePacket(const uint8_t* data, int len) {
   if (len != 8) return;
 
@@ -56,29 +73,33 @@ void handlePacket(const uint8_t* data, int len) {
   uint8_t  waveformId = data[4];
   uint16_t durationMs = ((uint16_t)data[5] << 8) | data[6];
 
+  // Log every received packet
+  Serial.printf("[PKT] type=%-9s  N=%3d E=%3d S=%3d W=%3d  dur=%dms\n",
+    waveformName(waveformId),
+    data[0], data[1], data[2], data[3],
+    durationMs
+  );
+
+  // STOP: kill all LEDs immediately
   if (waveformId == WF_STOP) {
     allOff();
     motorOffAt = 0;
+    lastPacketMs = millis();
     return;
   }
 
-  // Select pin index: 0=footstep, 1=gunshot
-  int idx = (waveformId == WF_GUNSHOT) ? 1 : 0;
+  // Channel: GUNSHOT uses index 1 pins, everything else uses index 0
+  int ch = (waveformId == WF_GUNSHOT) ? 1 : 0;
 
-  // data[0..3] = duty for N, E, S, W
-  ledcWrite(PIN_N[idx], data[0]);
-  ledcWrite(PIN_E[idx], data[1]);
-  ledcWrite(PIN_S[idx], data[2]);
-  ledcWrite(PIN_W[idx], data[3]);
+  // Drive direction LEDs with PWM intensity from packet
+  allOff();
+  ledcWrite(PIN_N[ch], data[0]);
+  ledcWrite(PIN_E[ch], data[1]);
+  ledcWrite(PIN_S[ch], data[2]);
+  ledcWrite(PIN_W[ch], data[3]);
 
-  // Turn off the opposite type (don't mix footstep + gunshot simultaneously)
-  int other = 1 - idx;
-  ledcWrite(PIN_N[other], 0);
-  ledcWrite(PIN_E[other], 0);
-  ledcWrite(PIN_S[other], 0);
-  ledcWrite(PIN_W[other], 0);
-
-  motorOffAt   = millis() + durationMs;
+  // Schedule auto-off after duration
+  motorOffAt = millis() + durationMs;
   lastPacketMs = millis();
 }
 
@@ -90,6 +111,7 @@ void onReceive(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
 // ── Setup ─────────────────────────────────────────────────────────────────
 void setup() {
   Serial.begin(115200);
+  delay(3000);
 
   // PWM setup — core 3.x: ledcAttachChannel(pin, freq, resolution, channel)
   for (int i = 0; i < 8; i++) {
