@@ -30,6 +30,7 @@ function SimPanel({ addCommand, addEvent }) {
     const cmd = simulateMotors(dir, category);
     addCommand(cmd);
     addEvent({ id: Date.now().toString(), category, direction: dir, confidence: 1, priority: 1, transmitted: false, latencyMs: 0, timestamp: Date.now() });
+    window.electronAPI?.transport?.sendCommand(cmd);
   }
 
   return (

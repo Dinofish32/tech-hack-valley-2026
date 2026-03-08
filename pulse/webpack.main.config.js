@@ -13,5 +13,7 @@ module.exports = {
     'utf-8-validate': 'commonjs utf-8-validate',
     'better-sqlite3': 'commonjs better-sqlite3',
     '@abandonware/bluetooth-hci-socket': 'commonjs @abandonware/bluetooth-hci-socket',
+    'serialport': 'commonjs serialport',
+    '@serialport/bindings-cpp': 'commonjs @serialport/bindings-cpp',
   },
 };

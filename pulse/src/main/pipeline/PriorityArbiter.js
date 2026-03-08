@@ -82,10 +82,13 @@ class PriorityArbiter {
         this._cooldownByDirection.set(dir, now);
       }
 
-      // Remove the selected event from pending
-      const idx = fresh.indexOf(top);
-      if (idx !== -1) fresh.splice(idx, 1);
-      this._pendingByDirection.set(dir, fresh);
+      // Remove selected event — if it's a GUNSHOT, also drop all pending FOOTSTEPs
+      // for this direction so they don't fire on the next tick
+      let remaining = fresh.filter(e => e !== top);
+      if (top.category === EventCategory.GUNSHOT) {
+        remaining = remaining.filter(e => e.category !== EventCategory.FOOTSTEP);
+      }
+      this._pendingByDirection.set(dir, remaining);
 
       // Max 4 events per tick
       if (output.length >= 4) break;

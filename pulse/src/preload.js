@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     connect: (opts) => ipcRenderer.invoke('transport:connect', opts),
     disconnect: () => ipcRenderer.invoke('transport:disconnect'),
     onStatus: (cb) => ipcRenderer.on('transport:status', (_e, d) => cb(d)),
+    sendCommand: (cmd) => ipcRenderer.invoke('transport:sendCommand', cmd),
   },
   profiles: {
     list: () => ipcRenderer.invoke('profiles:list'),

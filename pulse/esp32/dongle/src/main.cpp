@@ -8,12 +8,13 @@
 //   3. Paste MAC into HEADBAND_MAC below
 //   4. Flash this sketch to the DONGLE ESP32 (plugged into PC)
 // ─────────────────────────────────────────────────────────────────────────────
+#include <Arduino.h>
 #include <esp_now.h>
 #include <WiFi.h>
 
 // ── Set this to the headband's MAC address (printed on headband Serial) ──────
-//F4:2D:C9:6C:8A:74
-uint8_t HEADBAND_MAC[6] = { 0xF4, 0x2D, 0xC9, 0x6C, 0x8A, 0x74 };
+//10:51:DB:0E:0E:30
+uint8_t HEADBAND_MAC[6] = { 0x10, 0x51, 0xDB, 0x0E, 0x0E, 0x30 };
 
 // ── Packet config (must match packetSchema.js) ────────────────────────────
 const int PACKET_LEN = 8;

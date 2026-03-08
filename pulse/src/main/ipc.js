@@ -243,6 +243,18 @@ function registerIpcHandlers(ipcMain, windowGetter) {
 
   // ── Calibration ───────────────────────────────────────────────────────────
 
+  ipcMain.handle('transport:sendCommand', async (_event, { motors, waveform, durationMs }) => {
+    try {
+      if (!transport) return { ok: false, error: 'No transport connected' };
+      const { buildPacket } = require('../shared/packetSchema');
+      transport.send(buildPacket({ motors, waveform, durationMs }));
+      return { ok: true };
+    } catch (err) {
+      console.error('[ipc] transport:sendCommand error:', err.message);
+      return { ok: false, error: err.message };
+    }
+  });
+
   ipcMain.handle('calibration:fire', async (_event, { motor, intensity, waveform }) => {
     try {
       if (!transport) return { ok: false, error: 'No transport connected' };
