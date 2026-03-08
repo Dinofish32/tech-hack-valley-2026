@@ -19,7 +19,7 @@ export default function Sidebar() {
     <aside className="flex flex-col w-[220px] min-w-[220px] h-screen bg-surface border-r border-muted">
       {/* Logo */}
       <div className="px-5 py-5 border-b border-muted">
-        <span className="text-xl font-bold tracking-widest text-accent">PULS8</span>
+        <span className="text-xl font-bold tracking-widest text-accent">PULSE8</span>
       </div>
 
       {/* Navigation */}

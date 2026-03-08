@@ -59,7 +59,7 @@ export default function HeadbandVisualizer() {
       <div className="flex gap-2">
         {motorQuadrant('W', 'W', 'W')}
         <div className="w-20 h-20 rounded-full bg-muted border-2 border-accent/30 flex items-center justify-center">
-          <span className="text-xs text-text-muted font-bold">PULS8</span>
+          <span className="text-xs text-text-muted font-bold">PULSE8</span>
         </div>
         {motorQuadrant('E', 'E', 'E')}
       </div>
