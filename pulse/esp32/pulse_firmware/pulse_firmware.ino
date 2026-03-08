@@ -10,14 +10,16 @@
 #include <esp_now.h>
 #include <WiFi.h>
 
-// ── Motor GPIO pins [footstep, gunshot] ───────────────────────────────────
+// ── LED GPIO pins [footstep, gunshot] ─────────────────────────────────────
 const int PIN_N[2] = {  6,  7 };
 const int PIN_S[2] = { 18, 19 };
 const int PIN_E[2] = {  2,  3 };
 const int PIN_W[2] = {  4,  5 };
 
-// Flat array for iteration: N_foot, N_gun, S_foot, S_gun, E_foot, E_gun, W_foot, W_gun
-const int ALL_PINS[8] = {  6,  7, 18, 19, 2, 3, 4, 5 };
+// 4 LEDC channels (0–3), one per direction — ESP32-C6 only has 6 channels total
+// Each channel is dynamically re-attached to footstep or gunshot pin as needed
+// Channel 0=N, 1=E, 2=S, 3=W
+int activePin[4] = { PIN_N[0], PIN_E[0], PIN_S[0], PIN_W[0] };
 
 // ── waveformId values (must match packetSchema.js WAVEFORM_IDS) ───────────
 const uint8_t WF_GUNSHOT  = 0x00;
@@ -39,7 +41,19 @@ unsigned long motorOffAt   = 0;
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 void allOff() {
-  for (int i = 0; i < 8; i++) ledcWrite(ALL_PINS[i], 0);
+  for (int i = 0; i < 4; i++) ledcWrite(activePin[i], 0);
+}
+
+// Drive one direction channel, re-attaching to the correct pin if needed
+void driveDir(int dirCh, const int pins[2], int typeCh, uint8_t val) {
+  int newPin = pins[typeCh];
+  if (activePin[dirCh] != newPin) {
+    ledcWrite(activePin[dirCh], 0);
+    ledcDetach(activePin[dirCh]);
+    ledcAttachChannel(newPin, PWM_FREQ, PWM_RESOLUTION, dirCh);
+    activePin[dirCh] = newPin;
+  }
+  ledcWrite(newPin, val);
 }
 
 const char* waveformName(uint8_t id) {
@@ -85,13 +99,10 @@ void handlePacket(const uint8_t* data, int len) {
 
   // Drive direction LEDs with PWM intensity from packet
   allOff();
-  Serial.printf("[LED] ch=%d  pins N=%d E=%d S=%d W=%d  vals %d %d %d %d\n",
-    ch, PIN_N[ch], PIN_E[ch], PIN_S[ch], PIN_W[ch],
-    data[0], data[1], data[2], data[3]);
-  ledcWrite(PIN_N[ch], data[0]);
-  ledcWrite(PIN_E[ch], data[1]);
-  ledcWrite(PIN_S[ch], data[2]);
-  ledcWrite(PIN_W[ch], data[3]);
+  driveDir(0, PIN_N, ch, data[0]);
+  driveDir(1, PIN_E, ch, data[1]);
+  driveDir(2, PIN_S, ch, data[2]);
+  driveDir(3, PIN_W, ch, data[3]);
 
   // Schedule auto-off after duration
   motorOffAt = millis() + durationMs;
@@ -108,10 +119,11 @@ void setup() {
   Serial.begin(115200);
   delay(3000);
 
-  // PWM setup — core 3.x: ledcAttachChannel(pin, freq, resolution, channel)
-  for (int i = 0; i < 8; i++) {
-    ledcAttachChannel(ALL_PINS[i], PWM_FREQ, PWM_RESOLUTION, i);
-  }
+  // PWM setup — 4 channels (0–3), one per direction, starting on footstep pins
+  ledcAttachChannel(PIN_N[0], PWM_FREQ, PWM_RESOLUTION, 0);
+  ledcAttachChannel(PIN_E[0], PWM_FREQ, PWM_RESOLUTION, 1);
+  ledcAttachChannel(PIN_S[0], PWM_FREQ, PWM_RESOLUTION, 2);
+  ledcAttachChannel(PIN_W[0], PWM_FREQ, PWM_RESOLUTION, 3);
   allOff();
 
   // ESP-NOW — STA mode, no AP connection needed
